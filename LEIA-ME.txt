@@ -1,0 +1,24 @@
+COSMOCARDS - VERSÃO PARA POSTAR (arquivos separados)
+=====================================================
+Arquivos:
+  index.html   página do jogo (abra este)
+  style.css    visual
+  data.js      cartas e personagens
+  assets.js    imagens e sons (o arquivo grande, ~15 MB)
+  engine.js    regras do jogo
+  net.js       online (sala com código)
+  fx.js        efeitos dos golpes
+  ui.js        telas e save
+
+IMPORTANTE: mantenha todos os arquivos na MESMA pasta.
+
+COMO POSTAR DE GRAÇA (GitHub Pages)
+1. Crie uma conta em github.com e um repositório novo e público (ex.: cosmocards).
+2. Add file > Upload files: envie TODOS os arquivos desta pasta (o assets.js tem 15 MB, o limite do site é 25 MB por arquivo).
+3. Settings > Pages > Source: "Deploy from a branch", branch "main", pasta "/ (root)" > Save.
+4. Em 1 a 2 minutos o jogo abre em  https://SEU-USUARIO.github.io/cosmocards/
+
+OUTRA OPÇÃO (Netlify Drop): acesse app.netlify.com/drop e arraste esta pasta inteira.
+
+Abrindo por um endereço https, o progresso é salvo sozinho no celular e o online
+com os amigos funciona. Passe o link para os amigos.

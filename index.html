@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<title>CosmoCards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&display=swap" rel="stylesheet">
+<!--STYLE--><link rel="stylesheet" href="style.css"><!--/STYLE-->
+</head>
+<body>
+<div id="root"><div id="stage">
+
+  <!-- MENU -->
+  <section id="menu" class="screen">
+    <div class="bg home" data-bg="bg_home"></div><div class="homefade"></div>
+    <div class="menubtns">
+      <button class="imgbtn" data-img="b_santuario" data-act="santuario" aria-label="Santuário"></button>
+      <button class="imgbtn" data-img="b_solo" data-act="cpu" aria-label="Solo"></button>
+      <button class="imgbtn" data-img="b_online" data-act="online" aria-label="Online"></button>
+      <button class="imgbtn" data-img="b_cartas" data-act="cards" aria-label="Cartas"></button>
+    </div>
+    <div class="menuicons">
+      <button class="imgbtn round" data-img="b_info" data-act="help" aria-label="Como jogar"></button>
+      <button class="imgbtn round snd" data-img="b_opt" data-act="mute" aria-label="Som"></button>
+      <div class="icon" data-act="fs" title="Tela cheia">⛶</div>
+    </div>
+    <button class="dbgbtn" data-act="debug">DEBUG</button>
+    <button class="savebtn" data-act="save">SALVAR</button>
+    <div class="borda l"></div><div class="borda r"></div>
+  </section>
+
+  <!-- SELEÇÃO -->
+  <section id="select" class="screen">
+    <div class="bg" data-bg="bg_select"></div>
+    <img class="seltitle" data-src="t_select" alt="Seleção de personagem">
+    <img class="selmodel l" alt=""><img class="selmodel r" alt="">
+    <div class="selplate l"><span></span></div><div class="selplate r"><span></span></div>
+    <div class="grid"></div>
+    <div class="selinfo"></div>
+    <div class="selbtns"><button class="imgbtn" data-img="b_voltar" data-act="back" aria-label="Voltar"></button><button class="imgbtn" data-img="b_avancar" data-act="confirm" aria-label="Avançar"></button></div>
+    <div class="borda l"></div><div class="borda r"></div>
+  </section>
+
+  <!-- VS -->
+  <section id="vs" class="screen">
+    <div class="vsbg"></div>
+    <div class="vsbox l"><img class="por" alt=""><img class="frm" data-src="box_l" alt=""></div>
+    <div class="vsbox r"><img class="por" alt=""><img class="frm" data-src="box_r" alt=""></div>
+    <div class="vsplate l"><span></span></div><div class="vsplate r"><span></span></div>
+    <img class="vsmark" data-src="vsbig" alt="VS">
+    <div class="vshouse"></div>
+    <div class="borda l"></div><div class="borda r"></div>
+  </section>
+
+  <!-- SANTUÁRIO -->
+  <section id="sant" class="screen">
+    <div class="bg" data-bg="bg_select"></div>
+    <img class="santtitle" data-src="t_sant" alt="Santuário">
+    <div class="carousel"></div>
+    <div class="santinfo"></div>
+    <div class="selbtns"><button class="imgbtn" data-img="b_voltar" data-act="back" aria-label="Voltar"></button><button class="imgbtn" data-img="b_avancar" data-act="santgo" aria-label="Avançar"></button></div>
+    <div class="borda l"></div><div class="borda r"></div>
+  </section>
+
+  <!-- CARTAS -->
+  <section id="cards" class="screen">
+    <div class="bg" data-bg="bg_select" style="filter:brightness(.6)"></div>
+    <img class="cardstitle" data-src="t_cards" alt="Coleção de cartas">
+    <div class="tabs">
+      <button class="tab" data-tab="all" data-img="tab_all"></button><button class="tab" data-tab="att" data-img="tab_att"></button>
+      <button class="tab" data-tab="def" data-img="tab_def"></button><button class="tab" data-tab="sp" data-img="tab_sp"></button>
+    </div>
+    <div class="cgrid"></div>
+    <div class="selbtns"><button class="imgbtn" data-img="b_voltar" data-act="back" aria-label="Voltar"></button></div>
+    <div class="borda l"></div><div class="borda r"></div>
+  </section>
+
+  <!-- ONLINE -->
+  <section id="online" class="screen">
+    <div class="bg" data-bg="bg_select"></div><div class="shade"></div>
+    <div class="center">
+      <img data-src="t_online" alt="Online" style="height:66px">
+      <div class="row" id="onChoice">
+        <div class="card-panel" style="width:430px">
+          <b style="font-size:22px;color:var(--gold)">Criar sala</b>
+          <span class="note">Você recebe um código e manda para o seu amigo.</span>
+          <button class="btn small" data-act="host">Criar sala</button>
+        </div>
+        <div class="card-panel" style="width:430px">
+          <b style="font-size:22px;color:var(--gold)">Entrar na sala</b>
+          <input class="codein" id="codeIn" maxlength="5" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <button class="btn small" data-act="join">Entrar</button>
+        </div>
+      </div>
+      <div class="card-panel" id="onWait" style="display:none;min-width:620px">
+        <span class="note">Código da sala</span>
+        <div class="code" id="codeOut">-----</div>
+        <div class="row"><button class="btn small" data-act="share">Compartilhar</button><button class="btn small ghost" data-act="copy">Copiar</button></div>
+        <div class="row"><div class="spin"></div><span class="note" id="onStatus">Aguardando seu amigo entrar…</span></div>
+      </div>
+      <div class="note" id="onMsg"></div>
+      <button class="imgbtn" data-img="b_voltar" data-act="back" aria-label="Voltar" style="width:230px;height:55px"></button>
+    </div>
+    <div class="borda l"></div><div class="borda r"></div>
+  </section>
+
+  <!-- BATALHA -->
+  <section id="battle" class="screen">
+    <div class="bg" data-bg="bg_battle"></div>
+    <div class="fighter me"><div class="shadow"></div><img alt=""></div>
+    <div class="fighter op"><div class="shadow"></div><img alt=""></div>
+    <div id="fxdim"></div><canvas id="fxc"></canvas>
+    <div class="hud me" data-side="me"><img class="frame" alt=""><div class="glass"><img alt=""><span></span></div>
+      <div class="bar"><div class="fill"></div><span></span></div><button class="plate" data-side="me"><img alt=""><span></span></button>
+      <div class="nm"></div><div class="effs"></div></div>
+    <div class="hud op" data-side="op"><img class="frame" alt=""><div class="glass"><img alt=""><span></span></div>
+      <div class="bar"><div class="fill"></div><span></span></div><button class="plate" data-side="op"><img alt=""><span></span></button>
+      <div class="nm"></div><div class="effs"></div></div>
+    <div class="pd me" data-side="me"><img data-src="powdef" alt=""><span class="def"></span><span class="att"></span><button class="star" data-img="b_passiva" aria-label="Passiva"></button></div>
+    <div class="pd op" data-side="op"><img data-src="powdef" alt=""><span class="def"></span><span class="att"></span><button class="star" data-img="b_passiva" aria-label="Passiva"></button></div>
+    <div class="topmid"><button class="imgbtn" data-img="b_menu" data-act="quit" aria-label="Menu" style="width:150px;height:54px"></button>
+      <button class="endturn" data-act="end" aria-label="Finalizar turno"></button><div class="turninfo"></div></div>
+    <div class="ophand"></div>
+    <img class="rail" data-src="rail" alt=""><img class="railtop" data-src="rail_top" alt="">
+    <div class="logline"></div>
+    <div class="hand"></div>
+    <div class="play"></div>
+    <div class="special"><img alt=""><div class="sname"></div></div>
+    <div class="banner"><img class="tb" data-src="turn_bg" alt=""><img class="tt" alt=""><span></span></div>
+    <div class="flash"></div>
+    <div class="mreveal"><b>O MESTRE DESPERTA</b><span>Sua verdadeira forma é revelada</span></div>
+    <div class="borda l"></div><div class="borda r"></div>
+    <div class="icon sndb" data-act="mute">♪</div>
+  </section>
+
+  <!-- AJUDA -->
+  <section id="help" class="screen"><div class="slides"></div>
+    <div class="corner"><button class="btn small" data-act="next">Próximo ›</button><button class="btn small ghost" data-act="back">Fechar</button></div>
+  </section>
+
+  <div class="modal" id="mZoom"><div class="zoomwrap"><div class="zoom"><div class="cost"></div><div class="dmg"></div></div>
+    <div class="zinfo"><h3></h3><div class="ty"></div><div class="kv"></div><p></p><div class="warn"></div>
+      <div class="row"><button class="btn small" data-act="use">Usar carta</button><button class="btn small ghost" data-act="close">Fechar</button></div></div></div></div>
+  <div class="modal" id="mStance"><div class="card-panel"><h3 style="margin:0;color:var(--gold);font-size:26px">Posição de combate</h3>
+    <div class="note">Muda Força/Defesa e o tipo de carta que você mais recebe. Uma troca por turno.</div><div class="stopts"></div>
+    <button class="btn small ghost" data-act="close">Fechar</button></div></div>
+  <div class="modal" id="mInfo"><div class="card-panel"><h3 style="margin:0;color:var(--gold);font-size:26px" class="ttl"></h3><div class="dlist"></div><button class="btn small ghost" data-act="close">Fechar</button></div></div>
+  <div class="modal" id="mEnd"><div class="endbox"><img alt=""><div class="note endmsg" style="font-size:18px"></div><div class="row"><button class="btn" data-act="again">Jogar de novo</button><button class="btn ghost" data-act="menu">Menu</button></div></div></div>
+  <div class="modal" id="mMsg"><div class="card-panel" style="max-width:640px"><div class="note msg" style="font-size:19px"></div><div class="row"><button class="btn small" data-act="ok">OK</button></div></div></div>
+  <div class="modal" id="mQuit"><div class="card-panel"><div class="note" style="font-size:20px">Sair da partida?</div><div class="row"><button class="btn small" data-act="yes">Sair</button><button class="btn small ghost" data-act="no">Continuar</button></div></div></div>
+  <div class="modal" id="mUnlock"><div class="unl"><img class="pf" data-src="popup" alt=""><img class="um" alt=""><img class="ut" data-src="t_unlock" alt="Personagem desbloqueado">
+    <div class="utx"></div><button class="imgbtn uok" data-img="b_ok" data-act="unlockok" aria-label="OK"></button></div></div>
+  <div class="modal" id="mDebug"><div class="card-panel" style="max-width:640px"><h3 style="margin:0;color:var(--gold);font-size:26px">Modo Debug</h3>
+    <div class="note dbginfo"></div>
+    <div class="row"><button class="btn small" data-act="dbgall">Ativar debug (liberar tudo)</button><button class="btn small" data-act="dbgoff">Desativar debug</button><button class="btn small ghost" data-act="dbgreset">Zerar progresso</button></div>
+    <button class="btn small ghost" data-act="close">Fechar</button></div></div>
+  <div class="modal" id="mSave"><div class="card-panel" style="max-width:720px"><h3 style="margin:0;color:var(--gold);font-size:26px">Salvar progresso</h3>
+    <div class="note saveinfo"></div>
+    <textarea id="saveCode" rows="3" spellcheck="false" autocomplete="off" placeholder="Código de save (cole aqui para carregar)"></textarea>
+    <div class="row"><button class="btn small" data-act="savecopy">Copiar código</button><button class="btn small" data-act="saveload">Carregar código</button></div>
+    <div class="row"><button class="btn small" data-act="saveexp">Baixar arquivo</button><button class="btn small" data-act="saveimp">Abrir arquivo</button></div>
+    <input type="file" id="saveFile" accept=".json,.txt,application/json,text/plain" style="display:none">
+    <button class="btn small ghost" data-act="close">Fechar</button></div></div>
+  <div class="toast" id="toast"></div>
+</div></div>
+<!--SCRIPTS-->
+<script src="data.js"></script>
+<script src="assets.js"></script>
+<script src="engine.js"></script>
+<script src="net.js"></script>
+<script src="fx.js"></script>
+<script src="ui.js"></script>
+<!--/SCRIPTS-->
+</body>
+</html>
