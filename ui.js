@@ -869,11 +869,19 @@
     $('#mZoom h3').textContent = title; $('#mZoom .ty').textContent = type; $('#mZoom p').textContent = desc;
   }
   const typeOf = card => card.special ? 'Golpe especial' : card.offensive ? 'Carta de ataque' : card.cardType === 0 ? 'Carta ofensiva' : 'Carta defensiva';
+  let zoomAt = 0, armed = null;
+  const armBtn = (id, label, run) => {
+    if (Date.now() - zoomAt < 700) return;
+    const b = $('#' + id);
+    if (armed === id) { armed = null; run(); return; }
+    armed = id; const old = b.textContent; b.textContent = 'Toque de novo para confirmar';
+    setTimeout(() => { if (armed === id) { armed = null; b.textContent = label; } }, 2500);
+  };
   function openZoom(uid) {
     const v = S.view; if (!v) return;
     const P = v.p[S.me], h = P.hand.find(x => x.uid === uid); if (!h) return;
     const card = E.cardOf(P, h.ref); zoomUid = uid; zoomRO = false;
-    Snd.play('sfx_card_zoom', .6);
+    Snd.play('sfx_card_zoom', .6); zoomAt = Date.now(); armed = null;
     const est = E.estimate(v, P, card), cost = Math.round(E.costOf(P, card));
     fillZoom(card, cardImg(P.charId, h.ref), cost, est, E.cardDesc(card), card.special ? CH[P.charId].special.tittle : card.tittle, typeOf(card));
     $('#mZoom .kv').innerHTML = `<span>Custo <b>${cost}</b> cosmo</span>` + (est != null ? `<span>Dano previsto <b>${est}</b></span>` : '') + `<span>Seu cosmo <b>${Math.floor(P.stats.cosmo)}</b></span>`;
@@ -1206,9 +1214,9 @@
       case 'quit': modal('mQuit'); break;
       case 'yes': goMenu(); break;
       case 'no': modal('mQuit', false); break;
-      case 'use': modal('mZoom', false); if (!zoomRO && zoomUid != null) { const el = $(`.card[data-uid="${zoomUid}"]`); if (el) el.style.opacity = '.3'; act({ type: 'play', uid: zoomUid }); } break;
-      case 'trapcard': modal('mZoom', false); if (zoomUid != null) act({ type: 'trap', uid: zoomUid }); break;
-      case 'discardcard': modal('mZoom', false); if (zoomUid != null) act({ type: 'discard', uid: zoomUid }); break;
+      case 'use': if (Date.now() - zoomAt < 400) break; modal('mZoom', false); if (!zoomRO && zoomUid != null) { const el = $(`.card[data-uid="${zoomUid}"]`); if (el) el.style.opacity = '.3'; act({ type: 'play', uid: zoomUid }); } break;
+      case 'trapcard': armBtn('zTrap', b.textContent, () => { modal('mZoom', false); if (zoomUid != null) act({ type: 'trap', uid: zoomUid }); }); break;
+      case 'discardcard': armBtn('zDisc', b.textContent, () => { modal('mZoom', false); if (zoomUid != null) act({ type: 'discard', uid: zoomUid }); }); break;
       case 'close': modal(mod, false); break;
       case 'ok': modal('mMsg', false); if (msg.cb) { const cb = msg.cb; msg.cb = null; cb(); } break;
       case 'again':
