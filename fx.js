@@ -62,6 +62,24 @@ window.FX = (function () {
     if (f > 1 - p.fout) a *= (1 - f) / p.fout;
     if (a <= 0.003) return;
     if (p.type === 'flash') { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.fillRect(0, 0, W, H); return; }
+    if (p.type === 'wall') {
+      const f2 = p.t / p.life, grow = 1 - Math.pow(1 - Math.min(1, f2 / 0.16), 3);
+      const w = p.w, h = p.h * grow, x = p.x - w / 2, y = p.y + p.h / 2 - h;
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(1, a);
+      const g = ctx.createLinearGradient(0, y, 0, y + h);
+      g.addColorStop(0, 'rgba(255,236,150,.62)'); g.addColorStop(0.5, 'rgba(255,196,70,.42)'); g.addColorStop(1, 'rgba(255,150,30,.55)');
+      ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+      ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+      for (let k = 0; k < 7; k++) {   // faixas de energia subindo
+        const yy = y + h - ((p.t * 230 + k * (p.h / 7)) % Math.max(1, h));
+        const gg = ctx.createLinearGradient(0, yy - 14, 0, yy + 14); gg.addColorStop(0, 'rgba(255,255,255,0)'); gg.addColorStop(0.5, 'rgba(255,250,210,.55)'); gg.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = gg; ctx.fillRect(x, yy - 14, w, 28);
+      }
+      ctx.restore();
+      ctx.shadowColor = '#ffb000'; ctx.shadowBlur = 38; ctx.strokeStyle = '#fff1b0'; ctx.lineWidth = 7; ctx.strokeRect(x, y, w, h);
+      ctx.shadowBlur = 0; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.strokeRect(x + 7, y + 7, w - 14, h - 14);
+      ctx.globalAlpha = 1; return;
+    }
     const img = tinted(p.k, p.color);
     if (!img || !(img.naturalWidth || img.width)) return;
     const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -112,17 +130,29 @@ window.FX = (function () {
   // ---------------- golpes especiais
   const SPECIALS = {
     async seiya(A, B, d, gold) {
-      const col = gold ? '#ffd66b' : '#9feaff';
-      aura(A, col, 1.8);
-      for (let i = 0; i < 46; i++) {
-        const s = [A[0] + d * R(30, 70), A[1] + R(-50, 30)], e = [B[0] + R(-70, 70), B[1] + R(-110, 80)], dur = R(0.16, 0.26);
+      const col = '#7fe4ff', acc = gold ? '#ffe49a' : '#ffffff';
+      aura(A, col, 1.7); if (gold) ring('circle2', A, 0.3, 1.5, 1.3, '#ffd66b', { vr: 2 });
+      const N = gold ? 46 : 38;
+      for (let i = 0; i < N; i++) {
         setTimeout(() => {
-          streak(s, e, dur * 1.8, col, R(10, 22));
-          proj('glow', s, e, dur, { w: R(36, 60), color: col, done: () => add({ k: 'star4', x: e[0], y: e[1], w: R(40, 70), vr: 6, life: 0.25, color: '#ffffff' }) });
-        }, i * 34);
+          const e = [B[0] + R(-90, 90), B[1] + R(-120, 90)];
+          const s0 = [A[0] + d * R(30, 80), A[1] + R(-70, 50)];   // só horizontal, saindo do Seiya
+          const dur = R(0.24, 0.34), sz = R(130, 230);
+          streak(s0, e, dur * 2.2, '#3f9cff', R(18, 32));
+          proj('glow', s0, e, dur, { w: sz * 1.25, color: '#2f86ff', a: 0.95 });   // fundo azul do punho
+          proj('glow', s0, e, dur, { w: sz * 0.7, color: '#7fd0ff', a: 0.8 });
+          proj('star4', s0, e, dur, { w: R(26, 46), vr: 14, color: acc, fout: 0.1 });
+          proj('soco', s0, e, dur, { w: sz, sx: d, rot: 0, color: '#9fe0ff', s: 0.8, s1: 1.1, done: () => {
+            add({ k: 'impact6', x: e[0], y: e[1], w: 170, life: 0.4, color: col, fin: 0.01 });
+            add({ k: 'star4', x: e[0], y: e[1], w: R(50, 80), vr: 8, life: 0.3, color: acc }); sparks(e, col, 6, 260); } });
+        }, i * 52);
       }
-      await wait(46 * 34 + 200); hit(B, col, 1.3); shake(7, 0.35); flash(col, 0.3, 0.35);
-      await wait(250);
+      await wait(N * 52 + 420);
+      proj('glow', [A[0] + d * 60, A[1] - 30], [B[0], B[1] - 20], 0.38, { w: 520, color: '#2f86ff', a: 0.95, s: 0.7, s1: 1.7 });
+      proj('soco', [A[0] + d * 60, A[1] - 30], [B[0], B[1] - 20], 0.38, { w: 300, sx: d, rot: 0, color: '#9fe0ff', s: 0.7, s1: 1.7, fin: 0.1, fout: 0.1 });
+      streak([A[0] + d * 60, A[1] - 30], [B[0], B[1] - 20], 0.5, '#5fb8ff', 70);
+      await wait(380); hit(B, col, 1.7); ring('shock', B, 0.3, 2.4, 0.7, col); shake(10, 0.5); flash(col, 0.35, 0.5);
+      await wait(300);
     },
     async seiyasag(A, B, d) { return SPECIALS.seiya(A, B, d, true); },
     async shiryu(A, B, d) {
@@ -168,10 +198,10 @@ window.FX = (function () {
     },
     async mu(A, B, d) {
       const P = [A[0] + d * 170, A[1] + 30];
-      for (let i = 0; i < 7; i++) add({ k: 'spike', x: P[0] + (i - 3) * 14 * d, y: A[1] + 170 - i * 6, w: R(150, 210), vy: -120, ay: 60, life: 1.5, delay: i * 0.06, fin: 0.12, fout: 0.3, color: '#bff2ff', rot: R(-0.15, 0.15) });
-      add({ k: 'glow', x: P[0], y: P[1], w: 420, h: 640, life: 1.4, color: '#8fe9ff', a: 0.7 });
-      ring('barrier', A, 0.8, 1.2, 1.4, '#8fe9ff', { w: 420 });
-      sparks(P, '#bff2ff', 24, 200); await wait(1300);
+      glow([A[0], A[1] + 100], '#ffd34d', 320, 0.8);
+      add({ type: 'wall', x: P[0], y: P[1], w: 170, h: 560, life: 2.1, fout: 0.25 });
+      for (let i = 0; i < 34; i++) add({ k: 'glow', x: P[0] + R(-85, 85), y: P[1] + R(80, 280), vy: R(-200, -80), w: R(14, 30), life: R(0.8, 1.4), delay: R(0, 1.1), color: '#ffe27a' });
+      await wait(1700);
     },
     async aldebaran(A, B, d) {
       add({ k: 'horn', x: A[0] + d * 60, y: A[1] - 40, w: 520, life: 1.3, sx: d, s: 0.7, s1: 1.05, fin: 0.2, fout: 0.4 });
