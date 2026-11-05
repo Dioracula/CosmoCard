@@ -154,7 +154,7 @@
     <div class="pd me" data-side="me"><img data-src="powdef" alt=""><span class="def"></span><span class="att"></span><button class="star" data-img="b_passiva" aria-label="Passiva"></button></div>
     <div class="pd op" data-side="op"><img data-src="powdef" alt=""><span class="def"></span><span class="att"></span><button class="star" data-img="b_passiva" aria-label="Passiva"></button></div>
     <div class="topmid"><button class="imgbtn" data-img="b_menu" data-act="quit" aria-label="Menu" style="width:150px;height:54px"></button>
-      <button class="endturn" data-act="end" aria-label="Finalizar turno"></button><div class="turninfo"></div><button class="modtag" data-act="modinfo"></button><button class="modtag wxt" data-act="wxinfo"></button></div>
+      <button class="endturn" data-act="end" aria-label="Finalizar turno"></button><div class="turninfo"></div><button class="modtag" data-act="modinfo"></button><button class="modtag wxt" data-act="wxinfo"></button><div class="trapi me" id="trapMe"></div><div class="trapi op" id="trapOp"></div></div>
     <div class="ophand"></div>
     <img class="rail" data-src="rail" alt=""><img class="railtop" data-src="rail_top" alt="">
     <div class="logline"></div>
@@ -163,9 +163,10 @@
     <div class="special"><img alt=""><div class="sname"></div></div>
     <div class="banner"><img class="tb" data-src="turn_bg" alt=""><img class="tt" alt=""><span></span></div>
     <div class="flash"></div>
+    <div class="sigcard" id="sigcard" data-act="sigopen"><div class="sart"></div><img class="sf" alt=""><div class="scost"></div><div class="snm"></div><div class="sbar"><i></i><b></b></div></div>
+    <div id="react"></div>
     <div class="mreveal"><b>O MESTRE DESPERTA</b><span>Sua verdadeira forma é revelada</span></div>
     <div class="borda l"></div><div class="borda r"></div>
-    <div class="icon sndb" data-act="opt">⚙</div>
   </section>
 
   <!-- AJUDA -->
@@ -182,7 +183,9 @@
   <div class="modal" id="mInfo"><div class="card-panel"><h3 style="margin:0;color:var(--gold);font-size:26px" class="ttl"></h3><div class="dlist"></div><button class="btn small ghost" data-act="close">Fechar</button></div></div>
   <div class="modal" id="mEnd"><div class="endbox"><img alt=""><div class="note endmsg" style="font-size:18px"></div><div class="row"><button class="btn" data-act="again">Jogar de novo</button><button class="btn ghost" data-act="menu">Menu</button></div></div></div>
   <div class="modal" id="mMsg"><div class="card-panel" style="max-width:640px"><div class="note msg" style="font-size:19px"></div><div class="row"><button class="btn small" data-act="ok">OK</button></div></div></div>
-  <div class="modal" id="mQuit"><div class="card-panel"><div class="note" style="font-size:20px">Sair da partida?</div><div class="row"><button class="btn small" data-act="yes">Sair</button><button class="btn small ghost" data-act="no">Continuar</button></div></div></div>
+  <div class="modal" id="mQuit"><div class="card-panel"><h3 style="margin:0;color:var(--gold);font-size:26px">Menu</h3>
+    <button class="btn" data-act="mute" id="qMusic"></button><button class="btn" data-act="sfx" id="qSfx"></button><button class="btn" data-act="fs" id="qFs"></button><button class="btn" data-act="react" id="qReact"></button>
+    <div class="row"><button class="btn small ghost" data-act="no">Continuar</button><button class="btn small" data-act="yes">Sair da partida</button></div></div></div>
   <div class="modal" id="mUnlock"><div class="unl"><img class="pf" data-src="popup" alt=""><img class="um" alt=""><img class="ut" data-src="t_unlock" alt="Personagem desbloqueado">
     <div class="utx"></div><button class="imgbtn uok" data-img="b_ok" data-act="unlockok" aria-label="OK"></button></div></div>
   <div class="modal" id="mDebug"><div class="card-panel" style="max-width:640px"><h3 style="margin:0;color:var(--gold);font-size:26px">Modo Debug</h3>
@@ -200,11 +203,12 @@
   <div class="modal" id="mMis"><div class="card-panel mis"><h3 style="margin:0;color:var(--gold);font-size:26px">Missões e Conquistas</h3>
     <div class="misrank"></div><div class="mislist"></div><h4 class="mish">Conquistas</h4><div class="achlist"></div>
     <button class="btn small ghost" data-act="close">Fechar</button></div></div>
+  <div class="modal" id="mSig"><div class="card-panel" style="max-width:560px"><h3 class="sgt" style="margin:0;color:var(--gold);font-size:26px"></h3><div class="twbody"><div class="sgd"></div><div style="color:#aaa;font-size:14px">Golpe Assinatura: carrega durante a luta e pode ser usado até 2 vezes.</div></div><div class="row"><button class="btn small" data-act="siggo">Usar</button><button class="btn small ghost" data-act="close">Cancelar</button></div></div></div>
   <div class="modal" id="mUlt"><div class="card-panel" style="max-width:680px"><h3 style="margin:0;color:var(--gold);font-size:26px">Fúria cheia! Escolha o poder</h3>
-    <div class="twbody"><div><b style="color:#ffcf40">Cosmo Final</b> — golpe único: 45 de dano + sua Força e cura 20 de vida.</div>
-    <div><b style="color:#9fe8ff">Sétimo Sentido</b> — por 2 turnos você não gera cosmo, mas ganha +10 de Força e +10 de Defesa.</div>
+    <div class="twbody"><div><b style="color:#ffcf40">Cosmo Final</b> — golpe único: 40 de dano + sua Força, drena 25 de cosmo do oponente, cura 15 de vida e dá +5 de Força permanente.</div>
+    <div><b style="color:#9fe8ff">8º Sentido (Arayashiki)</b> — o sentido que permite manter a consciência, a individualidade e o controle do Cosmo ao cruzar a fronteira da morte e entrar no Inferno (Mundo dos Mortos) sem se submeter às leis de Hades. Por 3 turnos: remove seus efeitos negativos, fica imune a novos, ganha +8 de Força e Defesa, e sobrevive ao primeiro golpe fatal com 1 de vida (+25 de cosmo).</div>
     <div style="color:#aaa;font-size:14px">Cada poder pode ser usado uma vez por luta.</div></div>
-    <div class="row"><button class="btn small" data-act="ultgo">Cosmo Final</button><button class="btn small" data-act="sensego">Sétimo Sentido</button><button class="btn small ghost" data-act="close">Cancelar</button></div></div></div>
+    <div class="row"><button class="btn small" data-act="ultgo">Cosmo Final</button><button class="btn small" data-act="sensego">8º Sentido</button><button class="btn small ghost" data-act="close">Cancelar</button></div></div></div>
   <div class="modal" id="mTeam"><div class="card-panel rgrid" style="min-width:560px;display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;color:var(--gold);font-size:26px">Opções de equipe</h3>
     <label>Tamanho<select id="tTeam"><option value="1">Solo (1 cavaleiro)</option><option value="2">Dupla</option><option value="3">Trio</option></select></label>
     <label>Troca<select id="tSwap"><option value="free">Livre (1x por turno, 10 cosmo)</option><option value="gratis">Livre e grátis (1x por turno)</option><option value="fall">Só quando o cavaleiro cai</option></select></label>
@@ -220,6 +224,7 @@
 <!--SCRIPTS-->
 <script src="data.js"></script>
 <script src="assets.js"></script>
+<script src="sig.js"></script>
 <script src="engine.js"></script>
 <script src="net.js"></script>
 <script src="fx.js"></script>

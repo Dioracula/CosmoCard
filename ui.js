@@ -77,23 +77,24 @@
     return URL.createObjectURL(new Blob([u], { type: mime }));
   }
   for (const k in window.ASSETS.img) IMG[k] = toBlob(window.ASSETS.img[k]);
+  for (const k in (window.SIGIMG || {})) IMG['sig_' + k] = toBlob(window.SIGIMG[k]);
   for (const k in window.ASSETS.snd) SND[k] = toBlob(window.ASSETS.snd[k]);
   FX.init(document.getElementById('fxc'), IMG, document.getElementById('battle'), document.getElementById('fxdim'));
   window.ASSETS = null;
   const url = k => 'url("' + IMG[k] + '")';
   const CH = {}; D.chars.forEach(c => { CH[c.id] = c; });
   const cardImg = (charId, ref) => ref === 'S' ? IMG['sp_' + CH[charId].key] : IMG['card_' + D.cards[ref].cardSpriteName];
-  const GROUP = { 0: 'seiya', 1: 'shiryu', 2: 'shun', 3: 'hyoga', 4: 'ikki' };
+  const GROUP = { 21: 'seiya', 0: 'seiya', 1: 'shiryu', 2: 'shun', 3: 'hyoga', 4: 'ikki' };
   const grp = id => GROUP[id] || 'ouro';
   const HOUSES = [[5, 'Casa de Áries'], [6, 'Casa de Touro'], [16, 'Casa de Gêmeos'], [7, 'Casa de Câncer'], [9, 'Casa de Leão'],
     [11, 'Casa de Virgem'], [12, 'Casa de Escorpião'], [19, 'Casa de Sagitário'], [13, 'Casa de Capricórnio'], [8, 'Casa de Aquário'], [15, 'Casa de Peixes'], [20, 'Salão do Mestre']];
-  const BASE_UNLOCK = [0, 1, 2, 3, 4], AIOROS_WINS = 20;
-  const unlockedSet = () => new Set(store.get('unlocked', BASE_UNLOCK));
+  const BASE_UNLOCK = [0, 1, 2, 3, 4, 21], AIOROS_WINS = 20;
+  const unlockedSet = () => new Set(BASE_UNLOCK.concat(store.get('unlocked', [])));
   // com o DEBUG ativo todos aparecem (inclusive no multiplayer); sem ele, só o que cada jogador desbloqueou
   const isUnl = id => !!store.get('debug', false) || unlockedSet().has(id);
   function unlockChar(id) { const u = unlockedSet(); if (u.has(id)) return false; u.add(id); store.set('unlocked', [...u]); return true; }
   const lockDesc = id => id === 19 ? `Vença mais ${Math.max(1, AIOROS_WINS - store.get('wins', 0))} luta(s) em qualquer modo para desbloquear este personagem!`
-    : id === 18 ? 'Atravesse todas as casas do Santuário para desbloquear este personagem!' : id === 20 ? 'Finalize o Santuário (Lenda do Santuário) para desbloquear este personagem!' : 'Vença este cavaleiro no modo Santuário para desbloqueá-lo!';
+    : id === 18 ? 'Atravesse todas as casas do Santuário para desbloquear este personagem!' : id === 20 ? 'Finalize o Santuário (Lenda do Santuário) para desbloquear este personagem!' : id === 21 ? 'Derrote o Mestre do Santuário no modo Santuário para desbloquear este personagem!' : 'Vença este cavaleiro no modo Santuário para desbloqueá-lo!';
   const santReal = () => Math.min(store.get('santuario', 0), HOUSES.length);
   const santProgress = () => store.get('debug', false) ? HOUSES.length : santReal();
 
@@ -129,6 +130,7 @@
     muted: store.get('mute', false), sfxOff: store.get('sfxoff', false), bgm: null, key: null, base: {},
     play(n, vol = 1, maxSec) {
       if (this.sfxOff || !SND[n]) return;
+      if (!maxSec && !/^(game_over|sfx_versus|sfx_unlock|sfx_your_turn|sfx_opponents_turn)/.test(n)) maxSec = /_especial$/.test(n) ? 3.2 : /^sfx_golpe_/.test(n) ? 2.2 : 1.8;
       let b = this.base[n]; if (!b) { b = this.base[n] = new Audio(SND[n]); b.preload = 'auto'; }
       const a = b.paused ? b : b.cloneNode(); a.volume = vol; try { a.currentTime = 0; } catch (e) {}
       a.play().catch(() => {});
@@ -154,9 +156,8 @@
     },
   };
   function updOpt() {
-    const m = $('#optMusic'); if (!m) return;
-    m.textContent = '🎵 Música: ' + (Snd.muted ? 'desligada' : 'ligada'); $('#optSfx').textContent = '🔊 Efeitos sonoros: ' + (Snd.sfxOff ? 'desligados' : 'ligados');
-    $('#optFs').textContent = '⛶ Tela cheia: ' + (document.fullscreenElement ? 'desativar' : 'ativar');
+    const tm = '🎵 Música: ' + (Snd.muted ? 'desligada' : 'ligada'), ts = '🔊 Efeitos sonoros: ' + (Snd.sfxOff ? 'desligados' : 'ligados'), tf = '⛶ Tela cheia: ' + (document.fullscreenElement ? 'desativar' : 'ativar'), tr = '👆 Reações por toque: ' + (rOn('guard') ? 'ligadas' : 'desligadas');
+    [['#optMusic', tm], ['#qMusic', tm], ['#optSfx', ts], ['#qSfx', ts], ['#optFs', tf], ['#qFs', tf], ['#qReact', tr], ['#optReact', tr]].forEach(([s, t]) => { const el = $(s); if (el) el.textContent = t; });
   }
   document.addEventListener('fullscreenchange', () => { try { updOpt(); } catch (e) {} });
   function sndIcons() {
@@ -187,7 +188,7 @@
   }
 
   // ---------- seleção de personagem
-  const order = [0, 1, 2, 3, 4, 5, 6, 16, 7, 11, 12, 9, 13, 8, 15, 18, 19, 20];
+  const order = [0, 1, 2, 3, 4, 5, 6, 16, 7, 11, 12, 9, 13, 8, 15, 18, 19, 20, 21];
   function buildGrid() {
     const g = $('#select .grid'); g.innerHTML = '';
     order.forEach(id => {
@@ -214,6 +215,8 @@
     p.classList.remove('hide'); m.style.opacity = 1;
     p.querySelector('span').innerHTML = CH[id].title.replace(/ de /i, '<br>de ');
     m.src = IMG['model_' + CH[id].key];
+    const bb = SELBB[CH[id].key] || [0, 600], sz = STAT[id] || 1, H = 600, ch = Math.min(690, 585 * sz / .97), hh = ch / ((bb[1] - bb[0]) / H);
+    m.style.height = hh + 'px'; { const w = hh * 414 / 600, X0 = 250, off = (X0 - (SELCX[CH[id].key] || .5) * w) + 'px'; m.style.left = side === 'l' ? off : 'auto'; m.style.right = side === 'r' ? off : 'auto'; } m.style.bottom = (26 - (1 - bb[1] / H) * hh) + 'px';
   }
   function renderSelect() {
     const online = S.mode === 'host' || S.mode === 'guest';
@@ -397,7 +400,7 @@
   const ZOD = [5, 6, 7, 8, 9, 11, 12, 13, 15, 16];
   function towerEnemy(f) {
     if (f % 10 === 0) return 20;
-    let pool = f <= 3 ? [0, 1, 2, 3, 4] : f < 9 ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13] : ZOD.concat([19, 18]);
+    let pool = f <= 3 ? [0, 1, 2, 3, 4] : f < 9 ? [0, 1, 2, 3, 4, 21, 5, 6, 7, 8, 9, 11, 12, 13] : ZOD.concat([19, 18]);
     if (Mo.isBossFloor(f)) pool = ZOD;
     pool = pool.filter(i => i !== S.run.char); return pool[Math.floor(Math.random() * pool.length)];
   }
@@ -441,22 +444,134 @@
   function apply(pi, a) {
     const G = S.G; if (!G || !a) return;
     let ok = false;
+    const rx = a.type === 'play' || a.type === 'sig'; if (rx) E.setReact(G, pi, a);
     if (a.type === 'play') { ok = E.playCard(G, pi, a.uid); if (!ok && S.mode !== 'host' && pi === 1) E.endTurn(G, pi); }
     else if (a.type === 'stance') ok = E.setStance(G, pi, a.s);
     else if (a.type === 'ult') ok = E.ultimate(G, pi);
     else if (a.type === 'sense') ok = E.seventhSense(G, pi);
+    else if (a.type === 'sig') ok = E.signature(G, pi);
     else if (a.type === 'swap') ok = E.swapTo(G, pi, a.i);
     else if (a.type === 'trap') ok = E.setTrap(G, pi, a.uid);
     else if (a.type === 'discard') ok = E.discardCard(G, pi, a.uid);
     else if (a.type === 'end') ok = E.endTurn(G, pi);
+    if (rx) E.clearReact(G, pi);
     pump();
   }
   function act(a) {
     if (!S.view || S.view.over || S.running) return;
-    if (S.view.turn !== S.me) return;
-    if (S.mode === 'guest') { if (S.pending) return; S.pending = true; S.link.send({ k: 'act', a }); renderControls(); return; }
-    apply(S.me, a);
+    if (S.view.turn !== S.me || S.busyR) return;
+    if (S.mode === 'guest') {
+      if (S.pending) return;
+      (async () => {
+        if (viewAtk(a) && rOn('prec')) { S.busyR = true; renderControls(); try { a.prec = await mgPrec(1 - S.me); } catch (e) {} S.busyR = false; }
+        S.pending = true; S.link.send({ k: 'act', a }); renderControls();
+      })(); return;
+    }
+    applyR(S.me, a);
   }
+  // ---------- reações por toque: Guarda Perfeita / Aparar / Contra-golpe (defesa) e Golpe Preciso (ataque)
+  const rOn = k => store.get('react_' + k, true) !== false;
+  function viewAtk(a) {
+    if (a.type === 'sig') return true;
+    if (a.type !== 'play') return false;
+    const P = S.view.p[S.me], h = P.hand.find(x => x.uid === a.uid), c = h && E.cardOf(P, h.ref); return !!(c && c.offensive);
+  }
+  function isAtk(G, pi, a) {
+    if (a.type === 'sig') return true;
+    if (a.type !== 'play') return false;
+    const p = G.p[pi], h = p.hand.find(x => x.uid === a.uid), c = h && E.cardOf(p, h.ref); return !!(c && c.offensive);
+  }
+  function askRemote() {
+    return new Promise(res => { const to = setTimeout(() => { S.askRes = null; res(0); }, 9000); S.askRes = q => { clearTimeout(to); S.askRes = null; res(q); }; S.link.send({ k: 'ask' }); });
+  }
+  async function applyR(pi, a) {
+    const G = S.G; if (!G || !a) return;
+    if (isAtk(G, pi, a) && !G.over) {
+      S.busyR = true; renderControls();
+      try {
+        const d = 1 - pi;
+        if (pi === S.me && a.prec == null && rOn('prec')) a.prec = await mgPrec(d);
+        a.guard = 0;
+        if (d === S.me) { if (rOn('guard')) a.guard = await mgGuard(d); }
+        else if (S.mode === 'host' && S.link) a.guard = await askRemote();
+      } catch (e) { console.error(e); }
+      S.busyR = false;
+    }
+    apply(pi, a);
+  }
+  function mgRun(build) {
+    return new Promise(res => {
+      const el = $('#react'); el.innerHTML = ''; el.classList.add('on'); let fin = false, tm;
+      const fw = ev => { if (!el.classList.contains('on')) return; if (el.contains(ev.target)) return; const h = el['on' + ev.type]; if (h) { ev.preventDefault(); h(ev); } };
+      const evs = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'];
+      evs.forEach(n => window.addEventListener(n, fw, true)); document.body.style.touchAction = 'none';
+      const unbind = () => { evs.forEach(n => window.removeEventListener(n, fw, true)); document.body.style.touchAction = ''; };
+      const done = (v, txt, ok, sub) => { if (fin) return; fin = true; clearTimeout(tm);
+        el.onpointerdown = el.onpointerup = el.onpointermove = el.onpointercancel = null; unbind();
+        const lvl = ok ? (v >= 2 ? 'perfect' : 'good') : 'miss';
+        el.querySelectorAll('.rg-ring:not(.tgt),.rg-arrow,.rg-weak').forEach(n => n.classList.add('res-' + lvl));
+        el.querySelectorAll('.rg-lbl').forEach(n => n.remove());
+        el.classList.remove('f-perfect', 'f-good', 'f-miss'); void el.offsetWidth; el.classList.add('f-' + lvl);
+        if (txt) { const t = mk('rg-res ' + lvl, el.dataset.x, el.dataset.y - 130, txt); if (sub) { const s = document.createElement('small'); s.textContent = sub; t.appendChild(s); } el.appendChild(t); }
+        Snd.play(lvl === 'perfect' ? 'sfx_gain_power' : lvl === 'good' ? 'sfx_card_flip' : 'sfx_lose_power', .8);
+        if (lvl === 'perfect') FX.shake(6, .25);
+        setTimeout(() => { el.classList.remove('on', 'f-perfect', 'f-good', 'f-miss'); el.innerHTML = ''; res(v); }, txt ? 750 : 40); };
+      build(el, done, t => { tm = setTimeout(() => done(0, 'MUITO LENTO', false), t); });
+    });
+  }
+  function mk(cls, x, y, txt) { const d = document.createElement('div'); d.className = cls; d.style.left = x + 'px'; d.style.top = y + 'px'; if (txt) d.textContent = txt; return d; }
+  function ripple(el, e, lvl) { const s = stage.getBoundingClientRect(), r = document.createElement('div'); r.className = 'rg-rip ' + lvl; r.style.left = (rot ? (e.clientY - s.top) / scale : (e.clientX - s.left) / scale) + 'px'; r.style.top = (rot ? (s.right - e.clientX) / scale : (e.clientY - s.top) / scale) + 'px'; el.appendChild(r); }
+  const toGame = (dx, dy) => rot ? [dy, -dx] : [dx, dy];
+  function mgTap(pi) {   // anel que encolhe: toque quando fechar no alvo
+    const [x, y] = chest(pi), T = 950;
+    return mgRun((el, done, arm) => {
+      el.dataset.x = x; el.dataset.y = y;
+      el.appendChild(mk('rg-lbl', x, y - 190, 'DEFENDA! Toque quando o anel fechar'));
+      const tgt = mk('rg-ring tgt', x, y); tgt.style.width = tgt.style.height = '110px'; el.appendChild(tgt);
+      const ring = mk('rg-ring', x, y); ring.style.width = ring.style.height = '420px'; el.appendChild(ring);
+      requestAnimationFrame(() => requestAnimationFrame(() => { ring.style.transition = `width ${T}ms linear,height ${T}ms linear`; ring.style.width = ring.style.height = '110px'; }));
+      Snd.play('sfx_card_zoom', .6); const t0 = performance.now();
+      el.onpointerdown = ev => { const sg = performance.now() - t0 - T, e = Math.abs(sg), ms = Math.round(sg) + ' ms';
+        ripple(el, ev, e <= 120 ? 'perfect' : e <= 280 ? 'good' : 'miss');
+        if (e <= 120) done(2, 'PERFEITO!', true, ms); else if (e <= 280) done(1, 'BOM!', true, sg < 0 ? 'um pouco cedo' : 'um pouco tarde'); else done(0, 'ERROU!', false, sg < 0 ? 'cedo demais' : 'tarde demais'); };
+      arm(T + 320);
+    });
+  }
+  function mgSwipe(pi, want, T, lbl) {   // deslize na direção indicada: 'up' | 'left' | 'right'
+    const [x, y] = chest(pi), AR = { up: '⬆', left: '⬅', right: '➡' };
+    return mgRun((el, done, arm) => {
+      el.dataset.x = x; el.dataset.y = y;
+      el.appendChild(mk('rg-lbl', x, y - 190, lbl));
+      el.appendChild(mk('rg-arrow', x, y, AR[want]));
+      const t0 = performance.now(); let sx = 0, sy = 0, down = false; Snd.play('sfx_card_zoom', .6);
+      const judge = e => { if (!down) return; const [gx, gy] = toGame(e.clientX - sx, e.clientY - sy), len = Math.hypot(gx, gy);
+        if (len < 30 * scale) return; down = false; ripple(el, e, 'good');
+        const dir = Math.abs(gx) > Math.abs(gy) ? (gx > 0 ? 'right' : 'left') : (gy < 0 ? 'up' : 'down'), t = performance.now() - t0;
+        if (dir !== want) return done(0, 'DIREÇÃO ERRADA', false, 'era ' + ({ up: 'para cima', left: 'para a esquerda', right: 'para a direita' })[want]);
+        if (t <= T * 0.6) done(2, 'PERFEITO!', true, 'deslize rápido'); else done(1, 'BOM!', true, 'um pouco lento'); };
+      el.onpointerdown = e => { down = true; sx = e.clientX; sy = e.clientY; }; el.onpointermove = judge; el.onpointerup = judge;
+      arm(T);
+    });
+  }
+  async function mgGuard(pi) {
+    const swipe = Math.random() < 0.4; let q;
+    if (swipe) { const want = ['up', 'left', 'right'][Math.floor(Math.random() * 3)]; q = await mgSwipe(pi, want, 900, 'APARE! Deslize na direção da seta'); }
+    else q = await mgTap(pi);
+    if (q === 2) { const c = await mgSwipe(pi, 'up', 800, 'CONTRA-GOLPE! Deslize para cima'); if (c === 2 || c === 1) q = 3; }
+    return q;
+  }
+  function mgPrec(pi) {   // ponto fraco do oponente: toque nele para um golpe preciso
+    const [cx, cy] = chest(pi), x = cx + R2(-60, 60), y = cy + R2(-110, 40), T = 900;
+    return mgRun((el, done, arm) => {
+      el.dataset.x = cx; el.dataset.y = cy;
+      el.appendChild(mk('rg-lbl', cx, cy - 190, 'GOLPE PRECISO! Toque no ponto fraco'));
+      const w = mk('rg-weak', x, y); el.appendChild(w);
+      w.onpointerdown = e => { e.stopPropagation(); done(2, 'PRECISO!', true, '+25% de dano'); };
+      el.onpointerdown = ev => { ripple(el, ev, 'miss'); done(0, 'ERROU O PONTO', false, 'dano normal'); };
+      arm(T);
+    });
+  }
+  const R2 = (a, b) => a + Math.random() * (b - a);
   async function startLocal(c0, c1, house, opts) {
     if (S.mode !== 'sant' && S.mode !== 'torre' && S.mode !== 'weekly') S.mode = 'cpu';
     S.me = 0; S.house = house || null;
@@ -487,7 +602,7 @@
   function onIdle() {
     const v = S.view; if (!v || v.over) return;
     if ((S.mode === 'cpu' || S.mode === 'sant' || S.mode === 'torre' || S.mode === 'weekly') && v.turn === 1) {
-      setTimeout(() => { if (S.G && !S.running && S.G.turn === 1 && !S.G.over) apply(1, E.aiStep(S.G, 1)); }, 650);
+      setTimeout(() => { if (S.G && !S.running && S.G.turn === 1 && !S.G.over) applyR(1, E.aiStep(S.G, 1)); }, 650);
     }
   }
 
@@ -496,7 +611,7 @@
   const chest = pi => [centerOf(pi)[0], 330];
   const dir = pi => sideOf(pi) === 'me' ? 1 : -1;
   // aura de cosmo em volta do personagem: cor por personagem, intensidade pelo cosmo acumulado
-  const AURA = { seiya: '235,252,255|140,225,255|50,160,225', shiryu: '170,255,190|30,215,100|8,120,50', ikki: '255,225,150|255,135,20|190,50,0',
+  const AURA = { seiya: '235,252,255|140,225,255|50,160,225', seiyacap: '235,252,255|140,225,255|50,160,225', shiryu: '170,255,190|30,215,100|8,120,50', ikki: '255,225,150|255,135,20|190,50,0',
     shun: '255,190,240|205,90,255|110,40,190', hyoga: '70,170,255|20,90,255|8,40,210', gold: '255,243,176|255,200,60|200,135,0', dark: '150,70,230|60,15,110|10,0,20' };
   const auraKey = (p, stance) => { const k = CH[p.charId].key; if (k === 'mestre') return stance ? 'dark' : 'gold'; return AURA[k] ? k : 'gold'; };
 
@@ -618,6 +733,21 @@
         await FX.special(c.key, chest(e.p), chest(1 - e.p), dir(e.p));
         return;
       }
+      case 'sig': {
+        const c = CH[e.charId], sp = $('#battle .special'), img = sp.querySelector('img');
+        img.src = IMG['vs_' + c.key] || IMG['model_' + c.key];
+        const left = sideOf(e.p) === 'me';
+        img.style.left = left ? '70px' : 'auto'; img.style.right = left ? 'auto' : '70px';
+        img.style.transform = `translateX(${left ? -600 : 600}px)` + (left ? '' : ' scaleX(-1)');
+        sp.querySelector('.sname').textContent = e.title.toUpperCase();
+        sp.classList.add('show'); Snd.play('sfx_' + c.sfx + '_especial', 1, 3.2);
+        await wait(30); img.style.transform = left ? 'translateX(0)' : 'translateX(0) scaleX(-1)';
+        await wait(1300); const fl = $('#battle .flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+        sp.classList.remove('show'); await wait(200);
+        setTimeout(() => Snd.play('sfx_golpe_' + c.sfx, .9, 2.2), 450);
+        await FX.sig(e.fx, chest(e.p), chest(1 - e.p), dir(e.p), e.c1, e.c2);
+        return;
+      }
       case 'ult': {
         const c = CH[e.charId]; if (me) track('ult');
         floatText(e.p, 'COSMO FINAL!', 'good', -40); Snd.play('sfx_' + c.sfx + '_especial'); await wait(700);
@@ -626,7 +756,7 @@
       }
       case 'sense': {
         const c = CH[e.charId]; if (me) track('ult');
-        floatText(e.p, 'SÉTIMO SENTIDO!', 'good', -40); Snd.play('sfx_setimo_sentido', .9, 3.4);
+        floatText(e.p, '8º SENTIDO · ARAYASHIKI!', 'good', -40); Snd.play('sfx_setimo_sentido', .9, 3.4);
         const f = fighterEl(e.p); f.classList.add('charge'); FX.flash('#fff2b0', 0.9, 0.55); FX.shake(5, 0.6);
         await wait(1500); f.classList.remove('charge'); return;
       }
@@ -655,7 +785,7 @@
       case 'swap': {
         Snd.play('sfx_character_change'); const f = fighterEl(e.p), key = CH[e.charId].key;
         f.classList.add('charge'); await wait(250);
-        f.querySelector('img').src = IMG['spr_' + key]; stanceFx(sideOf(e.p), 0);
+        f.querySelector('img').src = IMG['spr_' + key]; setSz(sideOf(e.p), e.charId); stanceFx(sideOf(e.p), 0);
         floatText(e.p, CH[e.charId].name + (e.forced ? ' entra!' : ' assume!'), 'good', -10);
         await wait(450); f.classList.remove('charge'); return;
       }
@@ -743,7 +873,7 @@
       el.querySelector('.bar span').textContent = Math.ceil(h.life);
       el.querySelector('.glass span').textContent = Math.floor(h.cosmo + 1e-6);
       fAura(side, st.p[pi], h);
-      { const rg = el.querySelector('.rage'); rg.style.display = st.norage ? 'none' : ''; const ready = h.rage >= 100 && !(h.ult && h.sense); rg.classList.toggle('ready', ready); rg.classList.toggle('used', !!(h.ult && h.sense)); rg.querySelector('i').style.width = Math.min(100, h.rage) + '%'; rg.querySelector('b').textContent = (h.ult && h.sense) ? 'PODERES USADOS' : ready ? 'PODER PRONTO! TOQUE' : (h.senseOn ? 'SÉTIMO SENTIDO ✦ ' : 'FÚRIA ') + h.rage + '%'; }
+      { const rg = el.querySelector('.rage'); rg.style.display = st.norage ? 'none' : ''; const ready = h.rage >= 100 && !(h.ult && h.sense); rg.classList.toggle('ready', ready); rg.classList.toggle('used', !!(h.ult && h.sense)); { const sb = $('#battle .pd.' + side + ' .star'); if (sb) sb.classList.toggle('glow', ready); } rg.querySelector('i').style.width = Math.min(100, h.rage) + '%'; rg.querySelector('b').textContent = (h.ult && h.sense) ? 'PODERES USADOS' : ready ? 'PRONTO' : (h.senseOn ? '8º SENTIDO ✦ ' : 'FÚRIA ') + h.rage + '%'; }
       el.querySelector('.plate span').textContent = ['NEUTRA', 'OFENSIVA', 'DEFENSIVA'][h.stance];
       const pd = $('#battle .pd.' + side);
       pd.querySelector('.att').textContent = Math.round(h.att); pd.querySelector('.def').textContent = Math.round(h.def);
@@ -751,12 +881,35 @@
     const oph = $('#battle .ophand'); const n = hud[1 - S.me].hand;
     if (oph.childElementCount !== n) { oph.innerHTML = ''; for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.style.backgroundImage = url('card_back'); oph.appendChild(d); } }
   }
+  // proporção dos personagens na batalha: referência = Seiya de Pégaso (V1); cada um mantém a sua estatura
+  const SELCX = { afrodite: .493, aioria: .496, aioros: .509, aldebaran: .492, camus: .5, deathmask: .496, hyoga: .489, ikki: .516, mestre: .503, miro: .498, mu: .483, saga: .518, seiya: .527, seiyacap: .505, seiyasag: .607, shaka: .503, shiryu: .509, shun: .504, shura: .464 };
+  const SELBB = { afrodite: [83, 587], aioria: [67, 584], aioros: [13, 590], aldebaran: [0, 594], camus: [95, 592], deathmask: [31, 583], hyoga: [112, 598], ikki: [104, 595], mestre: [0, 600], miro: [60, 581], mu: [73, 589], saga: [38, 586], seiya: [125, 600], seiyacap: [1, 600], seiyasag: [0, 600], shaka: [84, 591], shiryu: [108, 597], shun: [136, 596], shura: [46, 585] };
+  const STAT = { 21: .92, 0: .92, 1: .94, 2: .9, 3: .95, 4: .96, 5: .97, 6: 1.08, 16: .98, 7: .95, 11: .98, 12: .95, 9: 1, 13: .97, 8: 1, 15: .98, 18: 1, 19: 1.02, 20: 1 };
+  const setSz = (side, id) => { const im = $('#battle .fighter.' + side + ' img'); if (im) im.style.setProperty('--sz', STAT[id] || 1); };
+  function openUlt() { const P = S.view.p[S.me]; $('#mUlt [data-act=ultgo]').disabled = !!P.ultUsed; $('#mUlt [data-act=sensego]').disabled = !!(P.senseUsed || P.senseOn); modal('mUlt'); }
+  function renderSig(v) {
+    const el = $('#sigcard'), I = E.sigInfo(v.p[S.me]);
+    if (!I || v.over) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    if (el.dataset.key !== I.key) { el.dataset.key = I.key; el.querySelector('.sf').src = IMG['sig_' + (I.t === 'def' ? 'frame_blue' : 'frame_red')];
+      const sa = el.querySelector('.sart'), custom = IMG['sig_art_' + I.key];
+      sa.style.backgroundImage = 'url(' + (custom || IMG['model_' + I.key]) + ')';
+      if (custom) { sa.style.backgroundSize = 'cover'; sa.style.backgroundPosition = 'center'; }
+      else { const bb = SELBB[I.key] || [0, 600], sw = 111, sh = 84, bgH = sh / (0.5 * (bb[1] - bb[0]) / 600), bgW = bgH * 414 / 600;
+        sa.style.backgroundSize = bgW + 'px ' + bgH + 'px'; sa.style.backgroundPosition = (sw / 2 - (SELCX[I.key] || .5) * bgW) + 'px ' + (-(bb[0] / 600) * bgH + 2) + 'px'; } }
+    el.classList.toggle('ready', !!I.ready); el.classList.toggle('can', !!I.can); el.classList.toggle('spent', I.uses >= 2);
+    el.querySelector('.scost').textContent = I.cost;
+    el.querySelector('.snm').textContent = I.name;
+    el.querySelector('.sbar i').style.width = Math.min(100, I.prog / I.goal * 100) + '%';
+    el.querySelector('.sbar b').textContent = I.uses >= 2 ? 'ESGOTADO' : I.ready ? 'PRONTO' : I.prog + '/' + I.goal + ' ' + I.trig;
+  }
   function render() {
     const v = S.view; if (!v) return;
+    renderSig(v);
     const P = v.p[S.me], O = v.p[1 - S.me];
     ['me', 'op'].forEach(side => {
       const p = side === 'me' ? P : O, c = CH[p.charId], g = grp(p.charId), el = $('#battle .hud.' + side);
-      $('#battle .fighter.' + side + ' img').src = IMG[(p.stance ? 'spr2_' : 'spr_') + c.key]; stanceFx(side, p.stance);
+      $('#battle .fighter.' + side + ' img').src = IMG[(p.stance ? 'spr2_' : 'spr_') + c.key]; setSz(side, p.charId); stanceFx(side, p.stance);
       el.querySelector('.frame').src = IMG['hp_' + g];
       el.querySelector('.glass img').src = IMG['vidro_' + g];
       el.querySelector('.plate img').src = IMG['sel_' + g];
@@ -781,12 +934,13 @@
       if (p.bench && p.bench.length) {
         html += (p.bench).map((b, i) => `<div class="bf${b.stats.life <= 0 ? ' dead' : ''}${side === 'me' && b.stats.life > 0 && !p.swapped && v.turn === S.me && !v.over && v.tr && v.tr.swap !== 'fall' && p.stats.cosmo >= E.swapCost(v) && myFree() ? ' can' : ''}" data-i="${i}" title="${esc(CH[b.charId].name)}" style='background-image:${url('thumb_' + CH[b.charId].key)}'><i><b style="width:${Math.max(0, Math.round(100 * b.stats.life / b.stats.maxLife))}%"></b></i></div>`).join('');
       }
-      if (p.trap) html += `<div class="trapi">🪤 ${side === 'me' ? esc(p.trap.title) : 'Armadilha?'}</div>`;
       if (el.innerHTML !== html) el.innerHTML = html;
+      const ti = $('#trap' + (side === 'me' ? 'Me' : 'Op')); ti.classList.toggle('on', !!p.trap);
+      if (p.trap) { const tx = side === 'me' ? '<small>Armadilha</small>' + esc(p.trap.title) : '<small>Armadilha</small>?'; if (ti.innerHTML !== tx) ti.innerHTML = tx; }
     });
   }
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-  const myFree = () => { const v = S.view; return v && v.turn === S.me && !v.over && !S.running && !S.pending; };
+  const myFree = () => { const v = S.view; return v && v.turn === S.me && !v.over && !S.running && !S.pending && !S.busyR; };
   function renderControls() {
     const v = S.view; if (!v) return;
     const P = v.p[S.me], mine = v.turn === S.me && !v.over, free = myFree();
@@ -980,7 +1134,7 @@
     dupla: { team: 2 }, trio: { team: 3 }, trioduro: { team: 3, swap: 'fall', last: true },
   };
   const onl = () => S.mode === 'host' || S.mode === 'guest';
-  const ruleOk = id => { const r = S.rules; if (!r || !onl()) return true; if (r.filter === 'zod') return id > 4; if (r.filter === 'bronze') return id <= 4; return true; };
+  const ruleOk = id => { const r = S.rules; if (!r || !onl()) return true; if (r.filter === 'zod') return id > 4 && id !== 21; if (r.filter === 'bronze') return id <= 4 || id === 21; return true; };
   function rulesText(r) {
     r = r || DEF_RULES; const p = [{ single: 'Luta única', bo3: 'Melhor de 3', tower: 'Torre a dois' }[r.fmt] || 'Luta única'];
     if (r.mod === 'random') p.push('Evento sorteado'); else if (r.mod) { const m = Mo.modById(r.mod); if (m) p.push('Evento: ' + m.name); }
@@ -1084,7 +1238,9 @@
       if (!$('#battle').classList.contains('on')) { S.queue.push({ ev: m.ev, st: m.st }); return; }
       deliver(m.ev, m.st);
     }
-    else if (m.k === 'act' && S.mode === 'host' && S.G) { apply(1, m.a); }
+    else if (m.k === 'act' && S.mode === 'host' && S.G) { applyR(1, m.a); }
+    else if (m.k === 'ask' && S.mode === 'guest') { (async () => { let q = 0; if (rOn('guard')) { S.busyR = true; try { q = await mgGuard(S.me); } catch (e) {} S.busyR = false; } S.link.send({ k: 'ares', q }); })(); }
+    else if (m.k === 'ares' && S.mode === 'host' && S.askRes) { S.askRes(m.q | 0); }
     else if (m.k === 'again') {
       S.friendIn = true;
       if (!$('#select').classList.contains('on')) { enterSelectOnline(); toast('Seu amigo quer ' + (S.rules && S.rules.fmt === 'bo3' && S.series && !S.series.fin && S.series.games ? 'continuar a série!' : 'revanche!')); S.link.send({ k: 'again' }); }
@@ -1132,6 +1288,7 @@
     const b = e.target.closest('[data-act]');
     if (!b) {
       if (e.target.closest('.hud .plate')) { const side = e.target.closest('.plate').dataset.side; if (side === 'me') openStance(); else openInfo('op'); return; }
+      if (e.target.closest('.pd.me .star') && myFree() && S.view) { const P = S.view.p[S.me]; if (!S.view.norage && P.rage >= 100 && !(P.ultUsed && P.senseUsed)) { openUlt(); return; } }
       const el = e.target.closest('.eff,.pd,.hud'); if (el) { Snd.play('sfx_info', .5); openInfo(el.dataset.side || el.closest('[data-side]').dataset.side); }
       return;
     }
@@ -1140,6 +1297,12 @@
     switch (a) {
       case 'mute': Snd.toggle(); updOpt(); break;
       case 'sfx': Snd.toggleSfx(); updOpt(); break;
+      case 'react': { const on = !rOn('guard'); store.set('react_guard', on); store.set('react_prec', on); updOpt(); break; }
+      case 'sigopen': { const I = S.view && E.sigInfo(S.view.p[S.me]); if (!I) break; if (!myFree()) { toast('Só no seu turno.'); break; }
+        if (!I.ready) { toast(I.name + ': ' + I.prog + '/' + I.goal + ' ' + I.trig + (I.uses >= 2 ? ' · limite de 2 usos' : '')); break; }
+        if (!I.can) { toast(I.name + ' pronto, mas custa ' + I.cost + ' de cosmo.'); break; }
+        $('#mSig .sgt').textContent = I.name; $('#mSig .sgd').textContent = I.desc + ' (Custo: ' + I.cost + ' de cosmo)'; modal('mSig'); break; }
+      case 'siggo': modal('mSig', false); act({ type: 'sig' }); break;
       case 'opt': updOpt(); modal('mOpt'); break;
       case 'fs': fullscreen(); setTimeout(updOpt, 400); break;
       case 'cpu': S.mode = 'cpu'; fullscreen(true); openSelect(); break;
@@ -1148,9 +1311,7 @@
       case 'preset': writeRules(Object.assign({}, DEF_RULES, PRESETS[b.dataset.p] || {})); $$('#onRules .presets .btn').forEach(x => x.classList.toggle('sel', x === b)); break;
       case 'weeklygo': S.mode = 'weekly'; modal('mTower', false); fullscreen(true); openSelect(); break;
       case 'wxinfo': { const ww = S.view && Mo.wxById(S.view.wx); if (ww) msg(ww.ic + ' ' + ww.name + ': ' + ww.desc); break; }
-      case 'ult': if (b.closest('.hud.me') && myFree() && b.classList.contains('ready')) {
-        const P = S.view.p[S.me]; $('#mUlt [data-act=ultgo]').disabled = !!P.ultUsed; $('#mUlt [data-act=sensego]').disabled = !!(P.senseUsed || P.senseOn); modal('mUlt');
-      } break;
+      case 'ult': if (b.closest('.hud.me') && myFree() && b.classList.contains('ready')) openUlt(); break;
       case 'ultgo': modal('mUlt', false); act({ type: 'ult' }); break;
       case 'sensego': modal('mUlt', false); act({ type: 'sense' }); break;
       case 'torre': S.mode = 'torre'; fullscreen(true); openSelect(); break;
@@ -1211,7 +1372,7 @@
       case 'teamN': openTeamOpts(); break;
       case 'teamok': modal('mTeam', false); renderSelect(); break;
       case 'end': act({ type: 'end' }); break;
-      case 'quit': modal('mQuit'); break;
+      case 'quit': updOpt(); modal('mQuit'); break;
       case 'yes': goMenu(); break;
       case 'no': modal('mQuit', false); break;
       case 'use': if (Date.now() - zoomAt < 400) break; modal('mZoom', false); if (!zoomRO && zoomUid != null) { const el = $(`.card[data-uid="${zoomUid}"]`); if (el) el.style.opacity = '.3'; act({ type: 'play', uid: zoomUid }); } break;
