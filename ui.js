@@ -15,7 +15,7 @@
       for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('cosmocards.')) { try { mem[k.slice(11)] = JSON.parse(localStorage.getItem(k)); } catch (e) {} } }
     } catch (e) { ls = false; }
     const sync = () => { try { window.name = JSON.stringify({ __cc: mem }); } catch (e) {} };
-    const SAVE_KEYS = ['unlocked', 'santuario', 'wins', 'lastChar', 'mute'];
+    const SAVE_KEYS = ['unlocked', 'santuario', 'wins', 'lastChar', 'mute', 'stars', 'ach', 'stats', 'torreBest', 'missions', 'weekly'];
     const snapshot = () => { const o = {}; SAVE_KEYS.forEach(k => { if (mem[k] != null) o[k] = mem[k]; }); return o; };
     const idbWrite = () => { if (!idb) return; try { idb.transaction('kv', 'readwrite').objectStore('kv').put(snapshot(), 'save'); } catch (e) {} };
     const put = (k, v) => { mem[k] = v; if (ls) { try { localStorage.setItem('cosmocards.' + k, JSON.stringify(v)); } catch (e) {} } };
@@ -26,6 +26,16 @@
       if (Array.isArray(o.unlocked)) { put('unlocked', [...new Set([...(mem.unlocked || [0, 1, 2, 3, 4]), ...o.unlocked.filter(x => Number.isInteger(x))])]); n++; }
       if (Number.isFinite(o.santuario)) { put('santuario', Math.max(mem.santuario || 0, o.santuario)); n++; }
       if (Number.isFinite(o.wins)) { put('wins', Math.max(mem.wins || 0, o.wins)); n++; }
+      if (Number.isFinite(o.stars)) { put('stars', Math.max(mem.stars || 0, o.stars)); n++; }
+      if (Number.isFinite(o.torreBest)) { put('torreBest', Math.max(mem.torreBest || 0, o.torreBest)); n++; }
+      if (o.ach && typeof o.ach === 'object') { put('ach', Object.assign({}, mem.ach || {}, o.ach)); n++; }
+      if (o.stats && typeof o.stats === 'object') {
+        const a = mem.stats || {}, r = Object.assign({}, a);
+        for (const k in o.stats) { const x = o.stats[k]; if (typeof x === 'number') r[k] = Math.max(a[k] || 0, x); else if (x && typeof x === 'object') r[k] = Object.assign({}, a[k] || {}, x); }
+        put('stats', r); n++;
+      }
+      if (o.missions && o.missions.day && (!mem.missions || o.missions.day >= mem.missions.day) && !(mem.missions && mem.missions.day === o.missions.day)) { put('missions', o.missions); n++; }
+      if (o.weekly && o.weekly.key && (!mem.weekly || o.weekly.key >= mem.weekly.key)) { put('weekly', o.weekly); n++; }
       if (n) { sync(); idbWrite(); }
       return n > 0;
     }
@@ -116,9 +126,9 @@
 
   // ---------- som
   const Snd = {
-    muted: store.get('mute', false), bgm: null, key: null, base: {},
+    muted: store.get('mute', false), sfxOff: store.get('sfxoff', false), bgm: null, key: null, base: {},
     play(n, vol = 1, maxSec) {
-      if (this.muted || !SND[n]) return;
+      if (this.sfxOff || !SND[n]) return;
       let b = this.base[n]; if (!b) { b = this.base[n] = new Audio(SND[n]); b.preload = 'auto'; }
       const a = b.paused ? b : b.cloneNode(); a.volume = vol; try { a.currentTime = 0; } catch (e) {}
       a.play().catch(() => {});
@@ -136,12 +146,19 @@
       this.bgm = new Audio(SND[k]); this.bgm.loop = true; this.bgm.volume = 0.4;
       if (!this.muted) this.bgm.play().catch(() => {});
     },
+    toggleSfx() { this.sfxOff = !this.sfxOff; store.set('sfxoff', this.sfxOff); },
     toggle() {
       this.muted = !this.muted; store.set('mute', this.muted);
       if (this.bgm) { if (this.muted) this.bgm.pause(); else this.bgm.play().catch(() => {}); }
       sndIcons();
     },
   };
+  function updOpt() {
+    const m = $('#optMusic'); if (!m) return;
+    m.textContent = '🎵 Música: ' + (Snd.muted ? 'desligada' : 'ligada'); $('#optSfx').textContent = '🔊 Efeitos sonoros: ' + (Snd.sfxOff ? 'desligados' : 'ligados');
+    $('#optFs').textContent = '⛶ Tela cheia: ' + (document.fullscreenElement ? 'desativar' : 'ativar');
+  }
+  document.addEventListener('fullscreenchange', () => { try { updOpt(); } catch (e) {} });
   function sndIcons() {
     $$('.icon[data-act=mute]').forEach(b => b.textContent = Snd.muted ? '✕♪' : '♪');
     $$('.imgbtn.snd').forEach(b => b.classList.toggle('off', Snd.muted));
@@ -153,6 +170,7 @@
   function show(id) {
     $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
     $$('.modal').forEach(m => m.classList.remove('on'));
+    if (id === 'menu') { try { updMenuBadge(); } catch (e) {} }
     if (id === 'menu' || id === 'online' || id === 'help' || id === 'cards') Snd.music('menu');
     if (id === 'select') Snd.music('character_selection_2');
   }
@@ -165,7 +183,7 @@
 
   function goMenu() {
     if (S.link) { S.link.close(); S.link = null; }
-    S.mode = null; S.G = null; S.view = null; S.queue = []; show('menu');
+    S.mode = null; S.G = null; S.view = null; S.queue = []; S.race = null; { const r = $('#onRules'); if (r) r.style.display = 'none'; } show('menu');
   }
 
   // ---------- seleção de personagem
@@ -177,15 +195,17 @@
       d.innerHTML = `<div class="face" style='background-image:${url('thumb_' + CH[id].key)}'></div><img src="${IMG.fr_open}" alt=""><img class="s" src="${IMG.fr_sel}" alt=""><img class="e" src="${IMG.fr_en}" alt=""><img class="l" src="${IMG.fr_lock}" alt="" style="display:none">`;
       d.addEventListener('click', () => {
         if (!isUnl(id)) { Snd.play('sfx_info', .6); toast('🔒 ' + lockDesc(id), 3200); return; }
+        if (!ruleOk(id)) { Snd.play('sfx_info', .6); toast('Fora das regras desta sala: ' + rulesText(S.rules), 3200); return; }
         S.sel = id; Snd.play('sfx_character_change', .7); renderSelect();
       });
       g.appendChild(d);
     });
   }
   function openSelect() {
-    S.selStep = 0; S.myPick = null;
+    S.selStep = 0; S.myPick = null; S.myTeam = [];
     if (S.mode !== 'host' && S.mode !== 'guest') S.opPick = null;
     S.sel = store.get('lastChar', 0); if (!CH[S.sel] || !isUnl(S.sel)) S.sel = 0;
+    if (!ruleOk(S.sel)) { const ok = order.find(i => isUnl(i) && ruleOk(i)); if (ok != null) S.sel = ok; }
     show('select'); renderSelect();
   }
   function plate(side, id) {
@@ -204,33 +224,56 @@
     plate('l', left); plate('r', right);
     $$('#select .fr').forEach(t => {
       const id = +t.dataset.id;
-      const selCyan = (S.mode === 'cpu' && S.selStep === 1) ? id === S.myPick : id === (S.myPick != null ? S.myPick : S.sel);
+      const selCyan = ((S.mode === 'cpu' && S.selStep === 1) ? id === S.myPick : id === (S.myPick != null ? S.myPick : S.sel)) || (S.myTeam || []).includes(id);
       const selRed = (S.mode === 'cpu' && S.selStep === 1 && id === S.sel) || (online && id === S.opPick) || (S.mode === 'sant' && id === right);
       t.classList.toggle('sel', selCyan); t.classList.toggle('en', selRed);
-      t.classList.toggle('lock', !isUnl(id));
+      t.classList.toggle('lock', !isUnl(id) || !ruleOk(id));
     });
     const c = CH[S.sel];
     let status = '';
-    if (S.mode === 'cpu') status = S.selStep === 0 ? 'Escolha o seu cavaleiro e toque em Avançar.' : 'Agora escolha o oponente (marcado em vermelho).';
+    const tb = $('#select .teamsel'); tb.style.display = (S.mode === 'cpu' && S.selStep === 0 && !(S.myTeam || []).length) ? '' : 'none';
+    tb.textContent = '👥 Equipe: ' + ['', 'Solo', 'Dupla', 'Trio'][tSize()] + ' ⚙';
+    if (S.mode === 'cpu') status = S.selStep === 0 ? (tSize() > 1 ? 'Monte a equipe: cavaleiro ' + ((S.myTeam || []).length + 1) + ' de ' + tSize() + '. Combinações dão sinergia!' : 'Escolha o seu cavaleiro e toque em Avançar.') : 'Agora escolha o oponente (marcado em vermelho).';
+    else if (online && S.rules && S.rules.pick === 'draft' && S.myPick == null && firstPicker() !== S.me && S.opPick == null) status = 'Draft: aguarde o outro jogador escolher primeiro…';
     else if (online) status = S.myPick != null ? (S.opPick != null ? 'Começando…' : 'Aguardando seu amigo escolher…') : (S.opPick != null ? 'Seu amigo já escolheu. Sua vez!' : 'Escolha seu cavaleiro.');
-    else status = 'Santuário: escolha o cavaleiro que vai atravessar as Casas do Zodíaco.';
+    else status = S.mode === 'weekly' ? 'Chefe da semana: escolha o cavaleiro para o duelo.' : S.mode === 'torre' ? 'Torre: escolha o cavaleiro para subir o mais alto que conseguir.' : 'Santuário: escolha o cavaleiro que vai atravessar as Casas do Zodíaco.';
     $('#select .selinfo').innerHTML = `<b>${esc(c.passive.split('\n')[0])}</b> ${esc(c.passive.split('\n').slice(1).join(' '))}<br>` +
       `Vida ${c.stats.life} · Força ${c.stats.attPower} · Defesa ${c.stats.defPower} · Especial: ${esc(c.special.tittle)}<br><span style="color:#9fe8ff">${esc(status)}</span>`;
-    $('#select [data-act=confirm]').disabled = online && S.myPick != null;
+    if (online && S.myPick == null && tSize() > 1) $('#select .selinfo').innerHTML += `<br><span style="color:#ffcf40">Monte a equipe: cavaleiro ${S.myTeam.length + 1} de ${tSize()}.</span>`;
+    $('#select [data-act=confirm]').disabled = online && (S.myPick != null || (S.rules && S.rules.pick === 'draft' && firstPicker() !== S.me && S.opPick == null));
+    if (online && S.rules) { const el = $('#select .selinfo'); el.innerHTML += `<br><span style="color:#ffcf40">Regras: ${esc(rulesText(S.rules))}</span>`; }
   }
   function confirmSelect() {
     Snd.play('sfx_button_click');
     store.set('lastChar', S.sel);
     if (S.mode === 'cpu') {
       if (S.selStep === 0) {
-        S.myPick = S.sel; S.selStep = 1;
+        if (tSize() > 1) {
+          if (S.myTeam.includes(S.sel)) { toast('Esse cavaleiro já está na equipe.', 2000); return; }
+          S.myTeam.push(S.sel);
+          if (S.myTeam.length < tSize()) { const nx = order.find(i => isUnl(i) && !S.myTeam.includes(i)); if (nx != null) S.sel = nx; renderSelect(); return; }
+          const syn = soloT().syn ? E.synergies(S.myTeam) : []; if (syn.length) toast('Sinergia: ' + syn.map(x => x.name + ' (' + x.desc + ')').join(' · '), 4200);
+        } else S.myTeam = [S.sel];
+        S.myPick = S.myTeam[0]; S.selStep = 1;
         const others = order.filter(i => i !== S.myPick && isUnl(i)); S.sel = others[Math.floor(Math.random() * others.length)];
         renderSelect(); return;
       }
-      startLocal(S.myPick, S.sel); return;
+      const n = tSize() - 1, pool = order.filter(i => isUnl(i) && i !== 20 && i !== S.sel).sort(() => Math.random() - .5);
+      startLocal(S.myPick, S.sel, null, { mod: Mo.rollMod(0.7), wx: Mo.rollWx(0.4), t0: S.myTeam.slice(1), t1: pool.slice(0, n), tr: soloT() }); return;
     }
+    if (S.mode === 'torre') { S.myPick = S.sel; startTower(); return; }
+    if (S.mode === 'weekly') { S.myPick = S.sel; startWeekly(); return; }
     if (S.mode === 'sant') { S.myPick = S.sel; openSant(); return; }
-    S.myPick = S.sel; S.link.send({ k: 'pick', c: S.myPick }); renderSelect(); maybeStartOnline();
+    const rl = S.rules || DEF_RULES;
+    if ((rl.pick === 'mirror' || rl.pick === 'draft') && S.opPick != null && (S.opTeam || [S.opPick]).includes(S.sel)) { toast('Espelho proibido: escolha um cavaleiro diferente do seu amigo.', 3000); return; }
+    if (rl.fmt === 'tower') { S.myPick = S.sel; startRace(); return; }
+    if (tSize() > 1) {
+      if (S.myTeam.includes(S.sel)) { toast('Esse cavaleiro já está na equipe.', 2000); return; }
+      S.myTeam.push(S.sel);
+      if (S.myTeam.length < tSize()) { const nx = order.find(i => isUnl(i) && ruleOk(i) && !S.myTeam.includes(i)); if (nx != null) S.sel = nx; renderSelect(); return; }
+      S.myPick = S.myTeam[0];
+    } else { S.myTeam = [S.sel]; S.myPick = S.sel; }
+    S.link.send({ k: 'pick', c: S.myPick, t: S.myTeam }); renderSelect(); maybeStartOnline();
   }
   // ---------- Santuário (carrossel das casas)
   function openSant(idx) {
@@ -265,7 +308,7 @@
       if (Math.abs(dx) > 60) { S.santIdx = Math.max(0, Math.min(HOUSES.length - 1, S.santIdx + (dx < 0 ? 1 : -1))); Snd.play('sfx_card_out', .6); renderSant(); }
     });
   })();
-  function santFight(i) { S.santCur = i; startLocal(S.myPick, HOUSES[i][0], HOUSES[i][1]); }
+  function santFight(i) { S.santCur = i; startLocal(S.myPick, HOUSES[i][0], HOUSES[i][1], { wx: Mo.WX[i % Mo.WX.length].id }); }
 
   // ---------- desbloqueio
   function showUnlocks(ids, done) {
@@ -290,6 +333,103 @@
     await wait(1700);
   }
 
+  // ---------- missões, conquistas e estatísticas
+  const Mo = window.Modes;
+  const getStats = () => Object.assign({ wins: 0, specials: 0, dmg: 0, cards: 0, crits: 0, stance: 0, torreBest: 0, combos: 0, ults: 0, weeklyWins: 0, winChars: {}, modsWon: {} }, store.get('stats', {}));
+  function missionsToday() { let m = store.get('missions', null); const d = Mo.todayKey(); if (!m || m.day !== d) { m = Mo.rollDaily(d); store.set('missions', m); } return m; }
+  const addStars = n => store.set('stars', store.get('stars', 0) + n);
+  const qToast = [];
+  function pushToast(t) { qToast.push(t); if (qToast.length === 1) (function nx() { toast(qToast[0], 3000); setTimeout(() => { qToast.shift(); if (qToast.length) nx(); }, 3100); })(); }
+  function checkAch() {
+    const got = store.get('ach', {}), sx = Object.assign(getStats(), { santuario: santReal() }); let ch = false;
+    Mo.ACH.forEach(a => { if (!got[a.id] && a.chk(sx)) { got[a.id] = 1; ch = true; addStars(a.stars); pushToast('🏆 Conquista: ' + a.name + ' (+' + a.stars + ' ★)'); } });
+    if (ch) store.set('ach', got);
+  }
+  function track(ev, n = 1, extra) {
+    const s = getStats();
+    if (ev === 'win') { s.wins++; if (extra && extra.key) s.winChars[extra.key] = 1; if (extra && extra.mod) s.modsWon[extra.mod] = 1; }
+    else if (ev === 'special') s.specials++; else if (ev === 'dmg') s.dmg += n; else if (ev === 'cards') s.cards++;
+    else if (ev === 'crit') s.crits++; else if (ev === 'stance') s.stance++; else if (ev === 'combo') s.combos++; else if (ev === 'ult') s.ults++; else if (ev === 'weekly') s.weeklyWins++;
+    else if (ev === 'floor' && extra && extra.floor > s.torreBest) s.torreBest = extra.floor;
+    store.set('stats', s);
+    const m = missionsToday(); let ch = false;
+    m.list.forEach(q => {
+      if (q.done) return; const d = Mo.missionDef(q.id); let add = 0;
+      if (d.ev === ev) add = n;
+      if (ev === 'win') { if (d.ev === 'winMod' && extra && extra.mod) add = 1; if (d.ev === 'winChar' && extra && extra.key === q.key) add = 1; }
+      if (add) { q.prog = Math.min(d.goal, q.prog + add); ch = true; if (q.prog >= d.goal) { q.done = true; addStars(d.stars); pushToast('★ Missão cumprida: ' + Mo.missionText(q) + ' (+' + d.stars + ' ★)'); } }
+    });
+    if (ch) store.set('missions', m);
+    checkAch();
+  }
+  function updMenuBadge() {
+    const m = missionsToday(), left = m.list.filter(q => !q.done).length;
+    const b = $('#menu .mbadge'); if (b) b.textContent = left ? left : '';
+  }
+  function openMis() {
+    const m = missionsToday(), stars = store.get('stars', 0), r = Mo.rankOf(stars), got = store.get('ach', {});
+    const pct = r.next ? Math.round((stars - r.from) / (r.next - r.from) * 100) : 100;
+    $('#mMis .misrank').innerHTML = `<b>${esc(r.name)}</b> · ${stars} ★ · Bônus na Torre: +${Mo.rankBonus(stars).life} de vida`
+      + `<div class="bar2"><i style="width:${pct}%"></i></div>` + (r.next ? `<small style="color:#bbb">Próxima patente (${esc(r.nextName)}): ${r.next} ★</small>` : '<small style="color:#bbb">Patente máxima!</small>');
+    $('#mMis .mislist').innerHTML = '<div class="mish" style="font-size:16px">Missões de hoje (renovam todo dia)</div>' + m.list.map(q => { const d = Mo.missionDef(q.id); return `<div class="mrow${q.done ? ' done' : ''}"><span>${q.done ? '✔ ' : ''}${esc(Mo.missionText(q))} <small style="color:#aaa">(${Math.min(q.prog, d.goal)}/${d.goal})</small></span><small>+${d.stars} ★</small></div>`; }).join('');
+    $('#mMis .achlist').innerHTML = Mo.ACH.map(a => `<div class="mrow${got[a.id] ? ' done' : ''}"><span>${got[a.id] ? '🏆 ' : '🔒 '}<b>${esc(a.name)}</b><br><small style="color:#aaa;font-weight:400">${esc(a.desc)}</small></span><small>+${a.stars} ★</small></div>`).join('');
+    modal('mMis');
+  }
+
+  // ---------- Duelo de Chefes semanal
+  function openWeekly() {
+    const w = Mo.weekly(), done = (store.get('weekly', {}) || {}).key === w.key, mm = Mo.modById(w.mod), ww = Mo.wxById(w.wx);
+    $('#mTower .ttl').textContent = '👑 Chefe da Semana';
+    $('#mTower .twbody').innerHTML = `<div class="vsl">${esc(w.boss === 20 ? '???' : CH[w.boss].title)}</div>`
+      + `<div>Vida +${w.scale.life} · Força +${w.scale.att} · Defesa +${w.scale.def} · gera mais cosmo</div>`
+      + `<div class="evl">${mm.ic} ${esc(mm.name)} — ${esc(mm.desc)}</div><div class="evl">${ww.ic} ${esc(ww.name)} — ${esc(ww.desc)}</div>`
+      + `<div style="color:${done ? '#6fd08a' : '#ffcf40'}">${done ? '✔ Recompensa desta semana já coletada (dá para lutar de novo por diversão)' : 'Primeira vitória da semana: +' + w.reward + ' ★'}</div>`
+      + '<div style="color:#aaa;font-size:14px">O chefe, a regra e o clima mudam toda semana.</div>';
+    $('#mTower .twbtns').innerHTML = '<button class="btn small" data-act="weeklygo">Escolher cavaleiro</button><button class="btn small ghost" data-act="close">Fechar</button>';
+    modal('mTower');
+  }
+  function startWeekly() {
+    const w = Mo.weekly(); S.wk = w;
+    startLocal(S.myPick, w.boss, 'Chefe da Semana', { mod: w.mod, wx: w.wx, b0: Mo.rankBonus(store.get('stars', 0)), b1: w.scale });
+  }
+
+  // ---------- Torre (modo roguelike)
+  const ZOD = [5, 6, 7, 8, 9, 11, 12, 13, 15, 16];
+  function towerEnemy(f) {
+    if (f % 10 === 0) return 20;
+    let pool = f <= 3 ? [0, 1, 2, 3, 4] : f < 9 ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13] : ZOD.concat([19, 18]);
+    if (Mo.isBossFloor(f)) pool = ZOD;
+    pool = pool.filter(i => i !== S.run.char); return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function startTower() {
+    S.run = { char: S.myPick, floor: 1, bless: [], relics: [], kind: 'b', rank: Mo.rankBonus(store.get('stars', 0)), opts: [] };
+    towerIntro();
+  }
+  function towerIntro() {
+    const R = S.run, f = R.floor; R.enemy = towerEnemy(f); R.mod = Mo.towerMod(f);
+    const boss = Mo.isBossFloor(f), e = CH[R.enemy], mm = Mo.modById(R.mod), best = store.get('torreBest', 0);
+    const chips = (R.bless.length || R.relics.length) ? R.relics.map(id => { const b = Mo.relicById(id); return `<span class="chip" style="border-color:#9fe8ff">${b.ic} ${esc(b.name)}</span>`; }).concat(R.bless.map(id => { const b = Mo.blessById(id); return `<span class="chip">${b.ic} ${esc(b.name)}</span>`; })).join('') : '<span class="chip">nenhuma bênção ainda</span>';
+    $('#mTower .ttl').textContent = 'Torre · Andar ' + f + (boss ? ' — CHEFE' : '');
+    $('#mTower .twbody').innerHTML = `<div class="vsl">${esc(CH[R.char].title)} <span style="color:#ff8a6a">×</span> ${esc(R.enemy === 20 ? '???' : e.title)}</div>`
+      + (mm ? `<div class="evl">${mm.ic} Evento: ${esc(mm.name)} — ${esc(mm.desc)}</div>` : '<div style="color:#aaa">Sem evento neste andar.</div>')
+      + (S.race ? `<div class="racel" style="color:#9fe8ff">👥 Amigo: ${raceTxt()}</div>` : '') + `<div>Seu cavaleiro: Patente +${R.rank.life} de vida</div><div class="chips">${chips}</div><div style="color:#aaa;font-size:14px">Recorde: andar ${best}</div>`;
+    $('#mTower .twbtns').innerHTML = '<button class="btn small" data-act="towerfight">Lutar!</button><button class="btn small ghost" data-act="towerquit">Desistir</button>';
+    show('menu'); S.mode = 'torre'; Snd.music('character_selection_2'); modal('mTower');
+  }
+  function towerFight() {
+    const R = S.run, f = R.floor; modal('mTower', false);
+    const es = Mo.enemyScale(f); if (Mo.isBossFloor(f)) es.life += 40;
+    startLocal(R.char, R.enemy, 'Torre · Andar ' + f + (Mo.isBossFloor(f) ? ' · Chefe' : ''), { mod: R.mod, wx: Mo.rollWx(f >= 4 ? 0.45 : 0), b0: Object.assign(Mo.sumBless(R.bless, R.rank), { relics: R.relics.slice() }), b1: es });
+  }
+  function towerBless() {
+    const R = S.run, rel = (R.floor - 1) % 3 === 0 && Mo.pickRelics(R.relics).length > 0;
+    R.kind = rel ? 'r' : 'b'; R.opts = rel ? Mo.pickRelics(R.relics) : Mo.pickBless(R.bless);
+    $('#mTower .ttl').textContent = 'Andar ' + (R.floor - 1) + ' vencido! Escolha ' + (rel ? 'uma relíquia' : 'uma bênção');
+    $('#mTower .twbody').innerHTML = '<div class="blrow">' + R.opts.map((b, i) => `<div class="bl${b.rare || S.run.kind === 'r' ? ' rare' : ''}" data-act="blesspick" data-i="${i}"><div class="ic">${b.ic}</div><b>${esc(b.name)}</b><span>${esc(b.desc)}</span></div>`).join('') + '</div>';
+    $('#mTower .twbtns').innerHTML = '';
+    show('menu'); S.mode = 'torre'; Snd.music('character_selection_2'); modal('mTower');
+  }
+
   // ---------- controle da partida
   function snap(G) { const ev = G.ev; G.ev = []; const st = JSON.parse(JSON.stringify(G)); G.ev = ev; return st; }
   function pump() {
@@ -303,6 +443,11 @@
     let ok = false;
     if (a.type === 'play') { ok = E.playCard(G, pi, a.uid); if (!ok && S.mode !== 'host' && pi === 1) E.endTurn(G, pi); }
     else if (a.type === 'stance') ok = E.setStance(G, pi, a.s);
+    else if (a.type === 'ult') ok = E.ultimate(G, pi);
+    else if (a.type === 'sense') ok = E.seventhSense(G, pi);
+    else if (a.type === 'swap') ok = E.swapTo(G, pi, a.i);
+    else if (a.type === 'trap') ok = E.setTrap(G, pi, a.uid);
+    else if (a.type === 'discard') ok = E.discardCard(G, pi, a.uid);
     else if (a.type === 'end') ok = E.endTurn(G, pi);
     pump();
   }
@@ -312,11 +457,13 @@
     if (S.mode === 'guest') { if (S.pending) return; S.pending = true; S.link.send({ k: 'act', a }); renderControls(); return; }
     apply(S.me, a);
   }
-  async function startLocal(c0, c1, house) {
-    if (S.mode !== 'sant') S.mode = 'cpu';
+  async function startLocal(c0, c1, house, opts) {
+    if (S.mode !== 'sant' && S.mode !== 'torre' && S.mode !== 'weekly') S.mode = 'cpu';
     S.me = 0; S.house = house || null;
-    await vsScreen(c0, c1, house);
-    S.G = E.newGame(c0, c1, 0); S.G.p[1].boss = true; enterBattle(); pump();
+    const sy = ['t0', 't1'].map((k, i) => opts && opts[k] && opts[k].length ? E.synergies([i ? c1 : c0].concat(opts[k])).map(x => x.name) : []);
+    const mm = opts && opts.mod ? Mo.modById(opts.mod) : null, ww = opts && opts.wx ? Mo.wxById(opts.wx) : null;
+    await vsScreen(c0, c1, [house, mm && ('Evento: ' + mm.name), ww && ('Clima: ' + ww.name), sy[0].length && ('Sua sinergia: ' + sy[0].join(', '))].filter(Boolean).join(' · '));
+    S.G = E.newGame(c0, c1, 0, opts); S.G.p[1].boss = true; enterBattle(); pump();
   }
   function enterBattle(keep) {
     S.mReveal = {};
@@ -339,7 +486,7 @@
   }
   function onIdle() {
     const v = S.view; if (!v || v.over) return;
-    if ((S.mode === 'cpu' || S.mode === 'sant') && v.turn === 1) {
+    if ((S.mode === 'cpu' || S.mode === 'sant' || S.mode === 'torre' || S.mode === 'weekly') && v.turn === 1) {
       setTimeout(() => { if (S.G && !S.running && S.G.turn === 1 && !S.G.over) apply(1, E.aiStep(S.G, 1)); }, 650);
     }
   }
@@ -395,7 +542,7 @@
   })();
   function fAura(side, p, h) {
     const f = $('#battle .fighter.' + side); if (!f || !p) return;
-    const [a, b, d] = AURA[auraKey(p, h.stance)].split('|'), k = h.maxCosmo > 0 ? Math.max(0, Math.min(1, h.cosmo / h.maxCosmo)) : 0;
+    const [a, b, d] = AURA[h.senseOn ? 'gold' : auraKey(p, h.stance)].split('|'), k = h.senseOn ? 1 : (h.maxCosmo > 0 ? Math.max(0, Math.min(1, h.cosmo / h.maxCosmo)) : 0);
     f.style.setProperty('--ca', a); f.style.setProperty('--cb', b); f.style.setProperty('--cd', d); f.style.setProperty('--k', k.toFixed(3));
     f.classList.toggle('c-on', k > 0.04); f.classList.toggle('c-max', k >= 0.995); f.classList.toggle('c-dark', auraKey(p, h.stance) === 'dark');
   }
@@ -442,6 +589,7 @@
     const me = e.p === S.me;
     switch (e.t) {
       case 'play': {
+        if (me) { track('cards'); if (e.special) track('special'); }
         statStack = { 0: 0, 1: 0 };
         const card = e.ref === 'S' ? CH[e.charId].special : D.cards[e.ref];
         const off = card.offensive;
@@ -470,7 +618,21 @@
         await FX.special(c.key, chest(e.p), chest(1 - e.p), dir(e.p));
         return;
       }
+      case 'ult': {
+        const c = CH[e.charId]; if (me) track('ult');
+        floatText(e.p, 'COSMO FINAL!', 'good', -40); Snd.play('sfx_' + c.sfx + '_especial'); await wait(700);
+        const fl = $('#battle .flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+        await FX.special(c.key, chest(e.p), chest(1 - e.p), dir(e.p)); return;
+      }
+      case 'sense': {
+        const c = CH[e.charId]; if (me) track('ult');
+        floatText(e.p, 'SÉTIMO SENTIDO!', 'good', -40); Snd.play('sfx_setimo_sentido', .9, 3.4);
+        const f = fighterEl(e.p); f.classList.add('charge'); FX.flash('#fff2b0', 0.9, 0.55); FX.shake(5, 0.6);
+        await wait(1500); f.classList.remove('charge'); return;
+      }
+      case 'weather': { const fl = $('#battle .flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); FX.shake(10, 0.5); Snd.play('sfx_golpe_saga', .5, 1.2); floatText(0, '⚡ Raio!', 'bad', -20); floatText(1, '⚡ Raio!', 'bad', -20); await wait(500); return; }
       case 'dmg': {
+        if (!me && e.v > 0) track('dmg', Math.round(e.v));
         const f = fighterEl(e.p);
         if (e.v > 0) {
           f.classList.remove('hit'); void f.offsetWidth; f.classList.add('hit');
@@ -486,13 +648,27 @@
       case 'debuff': floatText(e.p, (e.good ? '▲ ' : '▼ ') + e.name, e.good ? 'good' : 'bad', 70); await wait(320); return;
       case 'passive': floatText(e.p, '★ ' + CH[st.p[e.p].charId].passive.split(':')[0], 'good', -50); await wait(260); return;
       case 'needles': floatText(e.p, '✶ Agulhas: ' + e.v, 'bad', 20); await wait(300); return;
-      case 'text': if (e.sfx) Snd.play(e.sfx); floatText(e.p, e.txt, e.kind === 'fail' ? 'bad' : 'good', -10);
+      case 'text': if (e.crit && !me) track('crit'); if (e.combo && me) track('combo'); if (e.sfx) Snd.play(e.sfx); floatText(e.p, e.txt, e.kind === 'fail' ? 'bad' : 'good', -10);
         if (e.txt === 'GRANDE CHIFRE!') await FX.horn(chest(e.p), chest(1 - e.p), dir(e.p));
         else if (e.kind === 'counter' || e.kind === 'block') FX.hit(chest(e.p), e.kind === 'block' ? '#9fe8ff' : '#ffb060', 0.7);
         await wait(e.kind === 'counter' || e.kind === 'block' ? 800 : 600); return;
+      case 'swap': {
+        Snd.play('sfx_character_change'); const f = fighterEl(e.p), key = CH[e.charId].key;
+        f.classList.add('charge'); await wait(250);
+        f.querySelector('img').src = IMG['spr_' + key]; stanceFx(sideOf(e.p), 0);
+        floatText(e.p, CH[e.charId].name + (e.forced ? ' entra!' : ' assume!'), 'good', -10);
+        await wait(450); f.classList.remove('charge'); return;
+      }
+      case 'trap': {
+        if (e.set) { Snd.play('sfx_card_in', .7); floatText(e.p, me ? ('Armadilha: ' + e.title) : 'Armadilha armada!', 'good', -10); await wait(650); }
+        else await wait(100);
+        return;
+      }
+      case 'discard': Snd.play('sfx_card_out', .7); if (me) renderHand(st); await wait(250); return;
       case 'cosmo': if (e.v > 0) { Snd.play('sfx_cosmo_recharge', .5); floatText(e.p, '+' + Math.round(e.v) + ' Cosmo', 'good', 60); } await wait(420); return;
       case 'draw': if (me && !e.silent) Snd.play('sfx_card_flip', .7); if (me) renderHand(st); await wait(e.silent ? 0 : 200); return;
       case 'stance': {
+        if (me && e.s) track('stance');
         // revelação: chefe (CPU) sempre; jogador usando o Mestre só com o DEBUG ativo
         const first = !(S.mReveal && S.mReveal[e.p]);
         if (e.reveal || (first && e.s && store.get('debug', false) && st.p[e.p].charId === 20)) { (S.mReveal = S.mReveal || {})[e.p] = true; await mestreReveal(e.p, st); }
@@ -510,7 +686,7 @@
         const win = e.winner === S.me, draw = e.winner === -1;
         Snd.music(null); Snd.play(win ? 'game_over_victory' : 'game_over_fail');
         $('#mEnd img').src = IMG[win ? 'win' : 'lose'];
-        if (win) store.set('wins', store.get('wins', 0) + 1);
+        if (win) { store.set('wins', store.get('wins', 0) + 1); track('win', 1, { key: CH[st.p[S.me].charId].key, mod: st.mod }); }
         let m = draw ? 'Empate!' : win ? 'Atena agradece, cavaleiro!' : 'Não desista. Eleve o seu cosmo e tente de novo!';
         let again = 'Jogar de novo';
         const unl = [];
@@ -525,8 +701,34 @@
           } else again = 'Tentar de novo';
         }
         if (win && store.get('wins', 0) >= AIOROS_WINS && unlockChar(19)) unl.push(19);
+        if (onl() && S.rules && S.rules.fmt === 'bo3' && S.series) {
+          const sr = S.series; if (e.winner >= 0) sr.w[e.winner]++; sr.games++; sr.keep = e.winner;
+          const mine = sr.w[S.me], theirs = sr.w[1 - S.me];
+          if (sr.w[0] >= 2 || sr.w[1] >= 2 || sr.games >= 5) {
+            sr.fin = true; again = 'Nova série';
+            m = (mine > theirs ? 'Você venceu a série ' : mine < theirs ? 'Seu amigo venceu a série ' : 'A série terminou empatada ') + mine + ' x ' + theirs + '!';
+          } else { m = (win ? 'Vitória!' : draw ? 'Empate!' : 'Derrota!') + ` Placar da série: você ${mine} x ${theirs} amigo. ` + (draw ? 'Os dois mantêm o cavaleiro.' : win ? 'Você mantém o cavaleiro; seu amigo escolhe outro.' : 'Você escolhe outro cavaleiro; seu amigo mantém o dele.'); again = 'Próxima luta'; }
+        }
+        if (S.mode === 'weekly') {
+          const w = S.wk || Mo.weekly();
+          if (win) {
+            if ((store.get('weekly', {}) || {}).key !== w.key) { store.set('weekly', { key: w.key }); addStars(w.reward); track('weekly'); m = 'Chefe da semana derrotado! +' + w.reward + ' ★'; }
+            else m = 'Vitória! (a recompensa desta semana já foi coletada)';
+          } else m = 'O chefe foi mais forte desta vez. Tente de novo com outro cavaleiro!';
+          again = 'Lutar de novo';
+        }
+        if (S.mode === 'torre') {
+          const f = S.run.floor;
+          if (win) {
+            track('floor', 1, { floor: f }); if (f > store.get('torreBest', 0)) store.set('torreBest', f);
+            S.run.floor++;
+            if (S.race) { S.race.me.cleared = f; S.link && S.link.send({ k: 'race', c: f, d: false }); }
+          } else if (draw) { m = 'Empate! Este andar será sorteado de novo.'; again = 'Tentar o andar'; S.run.redo = true; }
+          else { m = 'Sua jornada terminou no andar ' + f + '. Recorde: andar ' + store.get('torreBest', 0) + '.'; again = 'Nova jornada'; S.run.dead = true;
+            if (S.race) { S.race.me = { cleared: f - 1, dead: true }; S.race.pending = true; S.link && S.link.send({ k: 'race', c: f - 1, d: true }); } }
+        }
         $('#mEnd .endmsg').textContent = m; $('#mEnd [data-act=again]').textContent = again;
-        showUnlocks(unl, () => modal('mEnd')); return;
+        showUnlocks(unl, () => (S.mode === 'torre' && win) ? towerBless() : (S.race && S.race.pending ? raceResult() : modal('mEnd'))); return;
       }
       default: return;
     }
@@ -541,6 +743,7 @@
       el.querySelector('.bar span').textContent = Math.ceil(h.life);
       el.querySelector('.glass span').textContent = Math.floor(h.cosmo + 1e-6);
       fAura(side, st.p[pi], h);
+      { const rg = el.querySelector('.rage'); rg.style.display = st.norage ? 'none' : ''; const ready = h.rage >= 100 && !(h.ult && h.sense); rg.classList.toggle('ready', ready); rg.classList.toggle('used', !!(h.ult && h.sense)); rg.querySelector('i').style.width = Math.min(100, h.rage) + '%'; rg.querySelector('b').textContent = (h.ult && h.sense) ? 'PODERES USADOS' : ready ? 'PODER PRONTO! TOQUE' : (h.senseOn ? 'SÉTIMO SENTIDO ✦ ' : 'FÚRIA ') + h.rage + '%'; }
       el.querySelector('.plate span').textContent = ['NEUTRA', 'OFENSIVA', 'DEFENSIVA'][h.stance];
       const pd = $('#battle .pd.' + side);
       pd.querySelector('.att').textContent = Math.round(h.att); pd.querySelector('.def').textContent = Math.round(h.def);
@@ -563,12 +766,24 @@
       el.querySelector('.effs').innerHTML = (good ? `<div class="eff" data-side="${side}" style='background-image:${url('ic_buff')}'><b>${good}</b></div>` : '') +
         (bad ? `<div class="eff" data-side="${side}" style='background-image:${url('ic_debuff')}'><b>${bad}</b></div>` : '');
     });
-    const hud = v.p.map(p => { const c = E.cur(p); return { life: p.stats.life, maxLife: p.stats.maxLife, cosmo: p.stats.cosmo, maxCosmo: p.stats.maxCosmo, att: c.attPower, def: c.defPower, stance: p.stance, hand: p.hand.length }; });
+    const hud = v.p.map(p => { const c = E.cur(p); return { life: p.stats.life, maxLife: p.stats.maxLife, cosmo: p.stats.cosmo, maxCosmo: p.stats.maxCosmo, att: c.attPower, def: c.defPower, stance: p.stance, hand: p.hand.length, rage: Math.round(p.rage || 0), ult: !!p.ultUsed, sense: !!p.senseUsed, senseOn: !!p.senseOn }; });
     renderHud(hud, v);
+    renderBench(v);
     $$('#battle .fighter').forEach(f => f.classList.remove('turn'));
     if (!v.over) fighterEl(v.turn).classList.add('turn');
     renderHand(v);
     renderControls();
+  }
+  function renderBench(v) {
+    ['me', 'op'].forEach(side => {
+      const p = v.p[side === 'me' ? S.me : 1 - S.me], el = $('#battle .bench.' + side);
+      let html = '';
+      if (p.bench && p.bench.length) {
+        html += (p.bench).map((b, i) => `<div class="bf${b.stats.life <= 0 ? ' dead' : ''}${side === 'me' && b.stats.life > 0 && !p.swapped && v.turn === S.me && !v.over && v.tr && v.tr.swap !== 'fall' && p.stats.cosmo >= E.swapCost(v) && myFree() ? ' can' : ''}" data-i="${i}" title="${esc(CH[b.charId].name)}" style='background-image:${url('thumb_' + CH[b.charId].key)}'><i><b style="width:${Math.max(0, Math.round(100 * b.stats.life / b.stats.maxLife))}%"></b></i></div>`).join('');
+      }
+      if (p.trap) html += `<div class="trapi">🪤 ${side === 'me' ? esc(p.trap.title) : 'Armadilha?'}</div>`;
+      if (el.innerHTML !== html) el.innerHTML = html;
+    });
   }
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   const myFree = () => { const v = S.view; return v && v.turn === S.me && !v.over && !S.running && !S.pending; };
@@ -580,6 +795,8 @@
     const usable = P.hand.some(h => E.isUsable(v, P, E.cardOf(P, h.ref)));
     et.classList.toggle('pulse', free && !usable);
     $('#battle .turninfo').textContent = v.over ? '' : 'Rodada ' + Math.ceil(v.totalTurn / 2) + ' · ' + (mine ? 'Seu turno' : 'Turno do oponente');
+    { const wt = $('#battle .wxt'), ww = Mo.wxById(v.wx); wt.classList.toggle('on', !!ww); if (ww) wt.textContent = ww.ic + ' ' + ww.name; const wxe = $('#wx'); wxe.className = ww ? 'on w-' + ww.id : ''; }
+    { const mt = $('#battle .modtag:not(.wxt)'), mm = Mo.modById(v.mod); mt.classList.toggle('on', !!mm); if (mm) mt.textContent = mm.ic + ' ' + mm.name; }
     $('#battle .logline').textContent = free ? (usable ? 'Toque numa carta para ver, ou arraste para cima para usar.' : 'Sem cosmo para mais cartas. Finalize o turno.') : '';
   }
   const sgn = n => (n >= 0 ? '+' : '') + n;
@@ -666,6 +883,15 @@
     if (P.invalid.includes(card.tittle)) warn = 'Esta carta foi bloqueada pelo Código do Cavaleiro: ela vai falhar.';
     $('#mZoom .warn').textContent = warn;
     const use = $('#mZoom [data-act=use]'); use.style.display = ''; use.disabled = !(E.isUsable(v, P, card) && myFree());
+    const zt = $('#zTrap'), zd = $('#zDisc'), norm = !card.special && !zoomRO;
+    zt.style.display = zd.style.display = norm ? '' : 'none';
+    const tOk = E.trapOk(P, card); zt.style.display = norm && tOk ? '' : 'none';
+    zt.textContent = '🪤 Armadilha (-' + E.trapCost(P, card) + ')';
+    zd.textContent = '♻ Descartar (+' + E.DISCARD_COSMO + ')';
+    zt.disabled = !(myFree() && !P.trap && P.stats.cosmo >= E.trapCost(P, card));
+    zd.disabled = !(myFree() && !P.discarded);
+    if (norm) $('#mZoom .kv').innerHTML += `<span>${tOk ? '🪤 Armadilha (custa o dobro): ativa o efeito desta carta ANTES do próximo ataque do inimigo · ' : ''}♻ Descartar: ganha ${E.DISCARD_COSMO} de cosmo (1x por turno)</span>`;
+    
     modal('mZoom');
   }
   function openInfo(side) {
@@ -712,7 +938,7 @@
       const d = document.createElement('div'); d.className = 'cc'; d.style.backgroundImage = 'url("' + it.img + '")';
       d.innerHTML = `<span class="cost">${it.cost}</span><small>${esc(it.label)}</small>`;
       d.addEventListener('click', () => {
-        zoomRO = true; Snd.play('sfx_card_zoom', .6);
+        zoomRO = true; { const a1 = $('#zTrap'), a2 = $('#zDisc'); if (a1) a1.style.display = 'none'; if (a2) a2.style.display = 'none'; } Snd.play('sfx_card_zoom', .6);
         fillZoom(it.card, it.img, it.cost, null, it.ch ? E.cardDesc(it.card) + '\n\nEspecial de ' + it.ch.title + '.' : E.cardDesc(it.card), it.card.tittle, typeOf(it.card));
         $('#mZoom .kv').innerHTML = `<span>Custo <b>${it.cost}</b> cosmo</span>`; $('#mZoom .warn').textContent = '';
         $('#mZoom [data-act=use]').style.display = 'none'; modal('mZoom');
@@ -734,13 +960,102 @@
     '31_setimo_sentido': 'sfx_setimo_sentido', '34_pureza_de_espirito': 'sfx_info', '35_desespero': 'sfx_lose_power', '36_ataques_continuos': 'sfx_chute_intenso',
     '37_ataques_opressivos': 'sfx_chute_cosmico', '38_afinidade_com_o_signo': 'sfx_afinidade_com_signo' };
 
+  // ---------- regras da sala online
+  const DEF_RULES = { fmt: 'single', pick: 'free', mod: '', wx: '', epic: false, norage: false, filter: 'all', team: 1, swap: 'free', assist: true, syn: true, last: false };
+  const TDEF = { team: 1, swap: 'free', assist: true, syn: true, last: false };
+  const soloT = () => Object.assign({}, TDEF, store.get('teamRules', {}));
+  const tSize = () => { if (onl()) { const r = S.rules || DEF_RULES; return r.fmt === 'tower' ? 1 : (r.team || 1); } return soloT().team; };
+  const teamTxt = r => { const p = [{ 1: 'Solo', 2: 'Dupla', 3: 'Trio' }[r.team]]; p.push({ free: 'troca 10 cosmo', gratis: 'troca grátis', fall: 'troca só ao cair' }[r.swap]); if (!r.assist) p.push('sem assistência'); if (!r.syn) p.push('sem sinergias'); if (r.last) p.push('Último Cavaleiro'); return p.join(', '); };
+  const PRESETS = {
+    clas: {}, sorteio: { mod: 'random', wx: 'random' }, epica: { epic: true }, bo3: { fmt: 'bo3' }, draft: { pick: 'draft' },
+    semfuria: { norage: true }, zod: { filter: 'zod' }, bronze: { filter: 'bronze' }, torre: { fmt: 'tower' },
+    dupla: { team: 2 }, trio: { team: 3 }, trioduro: { team: 3, swap: 'fall', last: true },
+  };
+  const onl = () => S.mode === 'host' || S.mode === 'guest';
+  const ruleOk = id => { const r = S.rules; if (!r || !onl()) return true; if (r.filter === 'zod') return id > 4; if (r.filter === 'bronze') return id <= 4; return true; };
+  function rulesText(r) {
+    r = r || DEF_RULES; const p = [{ single: 'Luta única', bo3: 'Melhor de 3', tower: 'Torre a dois' }[r.fmt] || 'Luta única'];
+    if (r.mod === 'random') p.push('Evento sorteado'); else if (r.mod) { const m = Mo.modById(r.mod); if (m) p.push('Evento: ' + m.name); }
+    if (r.wx === 'random') p.push('Clima sorteado'); else if (r.wx) { const w = Mo.wxById(r.wx); if (w) p.push('Clima: ' + w.name); }
+    if (r.epic) p.push('Batalha Épica'); if (r.norage) p.push('Sem Fúria');
+    if (r.filter === 'zod') p.push('Só Zodíacos'); if (r.filter === 'bronze') p.push('Só Bronzes');
+    if (r.pick === 'mirror') p.push('Espelho proibido'); if (r.pick === 'draft') p.push('Draft');
+    if ((r.team || 1) > 1 && r.fmt !== 'tower') p.push('Equipe: ' + teamTxt(r));
+    return p.join(' · ');
+  }
+  function fillRuleSelects() {
+    $('#rMod').innerHTML = '<option value="">Nenhum</option><option value="random">Sorteado a cada luta</option>' + Mo.MODS.map(m => `<option value="${m.id}">${m.ic} ${esc(m.name)}</option>`).join('');
+    $('#rWx').innerHTML = '<option value="">Nenhum</option><option value="random">Sorteado a cada luta</option>' + Mo.WX.map(w => `<option value="${w.id}">${w.ic} ${esc(w.name)}</option>`).join('');
+  }
+  function readRules() {
+    S.rules = { fmt: $('#rFmt').value, pick: $('#rPick').value, mod: $('#rMod').value, wx: $('#rWx').value, epic: $('#rEpic').value === '1', norage: $('#rRage').value === '0', filter: $('#rFilter').value,
+      team: +$('#rTeam').value, swap: $('#rSwap').value, assist: $('#rAssist').value === '1', syn: $('#rSyn').value === '1', last: $('#rLast').value === '1' };
+    $('#rSum').textContent = rulesText(S.rules);
+  }
+  function writeRules(r) {
+    $('#rFmt').value = r.fmt; $('#rPick').value = r.pick; $('#rMod').value = r.mod; $('#rWx').value = r.wx; $('#rEpic').value = r.epic ? '1' : '0'; $('#rRage').value = r.norage ? '0' : '1'; $('#rFilter').value = r.filter;
+    $('#rTeam').value = r.team || 1; $('#rSwap').value = r.swap || 'free'; $('#rAssist').value = r.assist === false ? '0' : '1'; $('#rSyn').value = r.syn === false ? '0' : '1'; $('#rLast').value = r.last ? '1' : '0';
+    readRules();
+  }
+  fillRuleSelects();
+  ['rFmt', 'rPick', 'rMod', 'rWx', 'rEpic', 'rRage', 'rFilter', 'rTeam', 'rSwap', 'rAssist', 'rSyn', 'rLast'].forEach(id => $('#' + id).addEventListener('change', readRules));
+  function readSoloT() {
+    const t = { team: +$('#tTeam').value, swap: $('#tSwap').value, assist: $('#tAssist').value === '1', syn: $('#tSyn').value === '1', last: $('#tLast').value === '1' };
+    store.set('teamRules', t); $('#tSum').textContent = t.team > 1 ? 'Equipe: ' + teamTxt(t) : 'Sem equipe: você luta com um cavaleiro só.';
+    if ($('#select').classList.contains('on')) renderSelect();
+  }
+  ['tTeam', 'tSwap', 'tAssist', 'tSyn', 'tLast'].forEach(id => $('#' + id).addEventListener('change', readSoloT));
+  function openTeamOpts() {
+    const t = soloT(); $('#tTeam').value = t.team; $('#tSwap').value = t.swap; $('#tAssist').value = t.assist ? '1' : '0'; $('#tSyn').value = t.syn ? '1' : '0'; $('#tLast').value = t.last ? '1' : '0';
+    readSoloT(); modal('mTeam');
+  }
+  // séries (melhor de 3) e escolhas
+  const newSeries = () => ({ w: [0, 0], games: 0, chars: [], keep: null });
+  const firstPicker = () => (S.gameNo || 0) % 2;
+  function trySendKeep() {
+    const sr = S.series, r = S.rules;
+    if (!(r && r.fmt === 'bo3' && sr && sr.keep != null && sr.games > 0 && !sr.fin)) return;
+    if (!S.friendIn || S.keepSent || !$('#select').classList.contains('on') || !S.link) return;
+    if (sr.keep === S.me || sr.keep === -1) { S.keepSent = true; S.myPick = sr.chars[S.me]; S.myTeam = (sr.teams && sr.teams[S.me]) || [S.myPick]; S.link.send({ k: 'pick', c: S.myPick, t: S.myTeam }); renderSelect(); maybeStartOnline(); }
+  }
+  function enterSelectOnline() { S.opPick = null; S.opTeam = null; S.keepSent = false; openSelect(); }
+  // corrida da Torre a dois
+  const raceTxt = () => { const f = S.race.fr; return f.gone && !f.dead ? 'saiu da partida' : f.dead ? 'caiu no andar ' + (f.cleared + 1) : f.cleared ? 'venceu ' + f.cleared + ' andar(es)' : 'começando…'; };
+  const updRace = () => { const el = $('#mTower .racel'); if (el && S.race) el.textContent = '👥 Amigo: ' + raceTxt(); };
+  function startRace() {
+    S.race = { me: { cleared: 0, dead: false }, fr: { cleared: 0, dead: false }, done: false };
+    startTower();
+  }
+  function raceResult() {
+    const R = S.race; if (!R) return; R.pending = false;
+    if (!R.fr.dead && !R.fr.gone) {
+      $('#mTower .ttl').textContent = 'Sua jornada acabou';
+      $('#mTower .twbody').innerHTML = `<div class="vsl">Você venceu ${R.me.cleared} andar(es)</div><div class="racel">👥 Amigo: ${raceTxt()}</div><div>Aguardando seu amigo terminar…</div>`;
+      $('#mTower .twbtns').innerHTML = '<button class="btn small ghost" data-act="towerquit">Sair</button>';
+      modal('mTower'); R.waiting = true; return;
+    }
+    R.waiting = false; R.done = true; modal('mTower', false);
+    const a = R.me.cleared, b = R.fr.cleared, win = a > b;
+    $('#mEnd img').src = IMG[win ? 'win' : 'lose']; Snd.music(null); Snd.play(win ? 'game_over_victory' : 'game_over_fail');
+    $('#mEnd .endmsg').textContent = (a > b ? 'Você venceu a corrida!' : a < b ? 'Seu amigo venceu a corrida.' : 'Empate na corrida!') + ` Você: ${a} andar(es) · Amigo: ${b} andar(es).`;
+    $('#mEnd [data-act=again]').textContent = 'Revanche'; modal('mEnd');
+  }
+
   // ---------- online
   function netHandlers() {
     return {
       code: c => { $('#codeOut').textContent = c; $('#onChoice').style.display = 'none'; $('#onWait').style.display = 'flex'; $('#onStatus').textContent = 'Aguardando seu amigo entrar…'; S.code = c; },
-      open: () => { Snd.play('sfx_unlock'); S.link.send({ k: 'hello', v: 2 }); S.opPick = null; openSelect(); },
+      open: () => {
+        Snd.play('sfx_unlock'); S.opPick = null; S.myPick = null; S.series = newSeries(); S.gameNo = 0; S.friendIn = false; S.keepSent = false; S.race = null;
+        if (S.mode === 'host') { if (!S.rules) S.rules = Object.assign({}, DEF_RULES); S.link.send({ k: 'hello', v: 3, rules: S.rules }); $('#onRules').style.display = 'none'; }
+        else S.link.send({ k: 'hello', v: 3 });
+        openSelect();
+        if (S.rules && S.mode === 'host') toast('Regras: ' + rulesText(S.rules), 3500);
+      },
       data: onNet,
-      close: () => { if (S.mode === 'host' || S.mode === 'guest') { S.link = null; msg('A conexão com o seu amigo caiu.', goMenu); } },
+      close: () => {
+        if (S.race) { S.race.fr.gone = true; S.race.fr.dead = true; S.link = null; toast('Seu amigo saiu da partida.'); updRace(); if (S.race.waiting) raceResult(); return; }
+        if (S.mode === 'host' || S.mode === 'guest') { S.link = null; msg('A conexão com o seu amigo caiu.', goMenu); } },
       error: t => {
         const m = { 'peer-unavailable': 'Sala não encontrada. Confira o código.', 'network': 'Sem conexão com o servidor. Verifique a internet.',
           'server-error': 'Servidor de salas indisponível. Tente de novo.', 'timeout': 'Não foi possível conectar. Tentem os dois na mesma rede Wi-Fi ou de novo em instantes.',
@@ -752,32 +1067,51 @@
   }
   function onNet(m) {
     if (!m || !m.k) return;
-    if (m.k === 'pick') { S.opPick = m.c; if ($('#select').classList.contains('on')) renderSelect(); maybeStartOnline(); }
-    else if (m.k === 'begin') { S.me = 1; S.queue = []; vsScreen(m.c1, m.c0).then(() => { enterBattle(true); if (S.queue.length && !S.running) runQueue(); }); }
+    if (m.k === 'hello' && S.mode === 'guest') { S.rules = m.rules || Object.assign({}, DEF_RULES); toast('Regras: ' + rulesText(S.rules), 3500); if ($('#select').classList.contains('on')) { if (!ruleOk(S.sel)) S.sel = order.find(i => isUnl(i) && ruleOk(i)); renderSelect(); } }
+    else if (m.k === 'race' && S.race) { S.race.fr = { cleared: m.c, dead: !!m.d }; updRace(); if (S.race.waiting && m.d) raceResult(); }
+    else if (m.k === 'clash') { S.myPick = null; S.opPick = null; S.myTeam = []; S.opTeam = null; S.keepSent = false; openSelect(); toast('Os dois escolheram o mesmo cavaleiro. Escolham de novo!', 3000); }
+    else if (m.k === 'pick') { S.opPick = m.c; S.opTeam = m.t || [m.c]; if ($('#select').classList.contains('on')) renderSelect(); maybeStartOnline(); }
+    else if (m.k === 'begin') { S.me = 1; S.queue = []; S.gameNo = (S.gameNo || 0) + 1; S.friendIn = false; S.keepSent = false; if (!S.series) S.series = newSeries(); S.series.chars = [m.c0, m.c1]; S.series.teams = [m.tm0 || [m.c0], m.tm1 || [m.c1]]; vsScreen(m.c1, m.c0, m.info).then(() => { enterBattle(true); if (S.queue.length && !S.running) runQueue(); }); }
     else if (m.k === 'upd' && S.mode === 'guest') {
       if (!$('#battle').classList.contains('on')) { S.queue.push({ ev: m.ev, st: m.st }); return; }
       deliver(m.ev, m.st);
     }
     else if (m.k === 'act' && S.mode === 'host' && S.G) { apply(1, m.a); }
-    else if (m.k === 'again') { if (!$('#select').classList.contains('on')) { S.opPick = null; openSelect(); toast('Seu amigo quer revanche!'); } }
+    else if (m.k === 'again') {
+      S.friendIn = true;
+      if (!$('#select').classList.contains('on')) { enterSelectOnline(); toast('Seu amigo quer ' + (S.rules && S.rules.fmt === 'bo3' && S.series && !S.series.fin && S.series.games ? 'continuar a série!' : 'revanche!')); S.link.send({ k: 'again' }); }
+      trySendKeep();
+    }
   }
   async function maybeStartOnline() {
     if (S.mode !== 'host' || S.myPick == null || S.opPick == null || S.starting) return;
+    const rl = S.rules || DEF_RULES;
+    const mt = S.myTeam && S.myTeam.length ? S.myTeam : [S.myPick], ot = S.opTeam || [S.opPick];
+    if ((rl.pick === 'mirror' || rl.pick === 'draft') && mt.some(x => ot.includes(x))) { S.link.send({ k: 'clash' }); S.myPick = null; S.opPick = null; S.myTeam = []; S.opTeam = null; S.keepSent = false; openSelect(); toast('Os dois escolheram o mesmo cavaleiro. Escolham de novo!', 3000); return; }
     S.starting = true; S.me = 0;
-    const G = E.newGame(S.myPick, S.opPick);
-    S.link.send({ k: 'begin', c0: S.myPick, c1: S.opPick });
-    await vsScreen(S.myPick, S.opPick);
+    const opts = { norage: rl.norage };
+    if (rl.fmt !== 'tower' && (rl.team || 1) > 1) { opts.t0 = mt.slice(1); opts.t1 = ot.slice(1); opts.tr = { swap: rl.swap, assist: rl.assist, syn: rl.syn, last: rl.last }; }
+    opts.mod = rl.mod === 'random' ? Mo.rollMod(1) : (rl.mod || null); opts.wx = rl.wx === 'random' ? Mo.rollWx(1) : (rl.wx || null);
+    if (rl.epic) { opts.b0 = { life: 100, startCosmo: 30 }; opts.b1 = { life: 100, startCosmo: 30 }; }
+    const mm = opts.mod && Mo.modById(opts.mod), ww = opts.wx && Mo.wxById(opts.wx);
+    const sy = opts.t0 && rl.syn ? E.synergies(mt).map(x => x.name).join(', ') + ' / ' + E.synergies(ot).map(x => x.name).join(', ') : '';
+    const info = [opts.t0 ? 'Equipe: ' + (opts.t0.length === 1 ? 'Dupla' : 'Trio') : '', sy.replace(/^ \/ $/, '').replace(/^ \/ | \/ $/g, ''), rl.fmt === 'bo3' && S.series ? 'Melhor de 3 · luta ' + (S.series.games + 1) : '', rl.epic ? 'Batalha Épica' : '', mm && ('Evento: ' + mm.name), ww && ('Clima: ' + ww.name)].filter(Boolean).join(' · ');
+    const G = E.newGame(S.myPick, S.opPick, undefined, opts);
+    S.gameNo = (S.gameNo || 0) + 1; S.friendIn = false; S.keepSent = false; if (!S.series) S.series = newSeries(); S.series.chars = [S.myPick, S.opPick]; S.series.teams = [mt, ot];
+    S.link.send({ k: 'begin', c0: S.myPick, c1: S.opPick, info, tm0: mt, tm1: ot });
+    await vsScreen(S.myPick, S.opPick, info);
     S.G = G; enterBattle(); S.starting = false; pump();
   }
   async function hostRoom() {
-    $('#onMsg').textContent = 'Criando sala…'; S.mode = 'host';
+    $('#onMsg').textContent = 'Criando sala…'; S.mode = 'host'; S.netRole = 'host'; S.series = newSeries(); S.gameNo = 0; S.race = null;
+    writeRules(S.rules || DEF_RULES); $('#onRules').style.display = 'flex';
     S.link = new Net.Link(netHandlers());
     try { await S.link.host(); $('#onMsg').textContent = ''; } catch (e) { netHandlers().error('lib'); }
   }
   async function joinRoom() {
     const c = $('#codeIn').value.trim().toUpperCase();
     if (c.length !== 5) { $('#onMsg').textContent = 'Digite o código de 5 letras que seu amigo recebeu.'; return; }
-    $('#onMsg').textContent = 'Conectando…'; S.mode = 'guest';
+    $('#onMsg').textContent = 'Conectando…'; S.mode = 'guest'; S.netRole = 'guest'; S.rules = null; S.series = newSeries(); S.gameNo = 0; S.race = null;
     S.link = new Net.Link(netHandlers());
     try { await S.link.join(c); } catch (e) { netHandlers().error('lib'); }
   }
@@ -785,6 +1119,7 @@
   // ---------- ações (delegação)
   let helpI = 0;
   stage.addEventListener('click', e => {
+    const bf = e.target.closest('.bench.me .bf.can'); if (bf) { act({ type: 'swap', i: +bf.dataset.i }); return; }
     const st = e.target.closest('.stopt'); if (st) { modal('mStance', false); act({ type: 'stance', s: +st.dataset.st }); return; }
     const b = e.target.closest('[data-act]');
     if (!b) {
@@ -795,10 +1130,27 @@
     const a = b.dataset.act, scr = (b.closest('.screen') || {}).id, mod = (b.closest('.modal') || {}).id;
     if (a !== 'mute') Snd.play('sfx_button_click', .6);
     switch (a) {
-      case 'mute': Snd.toggle(); break;
-      case 'fs': fullscreen(); break;
+      case 'mute': Snd.toggle(); updOpt(); break;
+      case 'sfx': Snd.toggleSfx(); updOpt(); break;
+      case 'opt': updOpt(); modal('mOpt'); break;
+      case 'fs': fullscreen(); setTimeout(updOpt, 400); break;
       case 'cpu': S.mode = 'cpu'; fullscreen(true); openSelect(); break;
       case 'santuario': S.mode = 'sant'; fullscreen(true); openSelect(); break;
+      case 'chefe': openWeekly(); break;
+      case 'preset': writeRules(Object.assign({}, DEF_RULES, PRESETS[b.dataset.p] || {})); $$('#onRules .presets .btn').forEach(x => x.classList.toggle('sel', x === b)); break;
+      case 'weeklygo': S.mode = 'weekly'; modal('mTower', false); fullscreen(true); openSelect(); break;
+      case 'wxinfo': { const ww = S.view && Mo.wxById(S.view.wx); if (ww) msg(ww.ic + ' ' + ww.name + ': ' + ww.desc); break; }
+      case 'ult': if (b.closest('.hud.me') && myFree() && b.classList.contains('ready')) {
+        const P = S.view.p[S.me]; $('#mUlt [data-act=ultgo]').disabled = !!P.ultUsed; $('#mUlt [data-act=sensego]').disabled = !!(P.senseUsed || P.senseOn); modal('mUlt');
+      } break;
+      case 'ultgo': modal('mUlt', false); act({ type: 'ult' }); break;
+      case 'sensego': modal('mUlt', false); act({ type: 'sense' }); break;
+      case 'torre': S.mode = 'torre'; fullscreen(true); openSelect(); break;
+      case 'missoes': openMis(); break;
+      case 'towerfight': towerFight(); break;
+      case 'towerquit': modal('mTower', false); goMenu(); break;
+      case 'blesspick': { const bl = S.run.opts[+b.dataset.i]; if (bl) { (S.run.kind === 'r' ? S.run.relics : S.run.bless).push(bl.id); towerIntro(); } break; }
+      case 'modinfo': { const mm = S.view && Mo.modById(S.view.mod); if (mm) msg(mm.ic + ' ' + mm.name + ': ' + mm.desc); break; }
       case 'cards': openCards(); break;
       case 'santgo': santFight(S.santIdx); break;
       case 'debug': {
@@ -848,18 +1200,28 @@
         if (scr === 'sant') { openSelect(); break; }
         goMenu(); break;
       case 'confirm': confirmSelect(); break;
+      case 'teamN': openTeamOpts(); break;
+      case 'teamok': modal('mTeam', false); renderSelect(); break;
       case 'end': act({ type: 'end' }); break;
       case 'quit': modal('mQuit'); break;
       case 'yes': goMenu(); break;
       case 'no': modal('mQuit', false); break;
       case 'use': modal('mZoom', false); if (!zoomRO && zoomUid != null) { const el = $(`.card[data-uid="${zoomUid}"]`); if (el) el.style.opacity = '.3'; act({ type: 'play', uid: zoomUid }); } break;
+      case 'trapcard': modal('mZoom', false); if (zoomUid != null) act({ type: 'trap', uid: zoomUid }); break;
+      case 'discardcard': modal('mZoom', false); if (zoomUid != null) act({ type: 'discard', uid: zoomUid }); break;
       case 'close': modal(mod, false); break;
       case 'ok': modal('mMsg', false); if (msg.cb) { const cb = msg.cb; msg.cb = null; cb(); } break;
       case 'again':
         modal('mEnd', false);
         if (S.mode === 'sant') { const won = S.view && S.view.winner === S.me; if (won) openSant(Math.min(santProgress(), HOUSES.length - 1)); else santFight(S.santCur); break; }
+        if (S.race && S.race.done) { S.mode = S.netRole; S.race = null; if (S.link) { S.friendIn = false; enterSelectOnline(); S.link.send({ k: 'again' }); } else goMenu(); break; }
+        if (S.mode === 'weekly') { openSelect(); break; }
+        if (S.mode === 'torre') { if (S.run && S.run.redo) { S.run.redo = false; towerIntro(); } else openSelect(); break; }
         if (S.mode === 'cpu') { openSelect(); break; }
-        if (S.link) { S.link.send({ k: 'again' }); S.opPick = null; openSelect(); } else goMenu();
+        if (S.link) {
+          const sr = S.series; if (sr && sr.fin) { S.series = newSeries(); S.gameNo = 0; }
+          enterSelectOnline(); S.link.send({ k: 'again' }); trySendKeep();
+        } else goMenu();
         break;
       case 'menu': goMenu(); break;
     }

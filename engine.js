@@ -52,10 +52,62 @@
     };
   }
 
-  function newGame(c0, c1, first) {
+  // bônus de Torre / escala de inimigo / eventos de batalha
+  function applyBonus(p, b) {
+    if (!b) return;
+    const st = p.stats;
+    if (b.life) { st.maxLife += b.life; st.life += b.life; }
+    if (b.att) st.attPower += b.att;
+    if (b.def) st.defPower += b.def;
+    if (b.startCosmo) st.cosmo = Math.min(st.maxCosmo, st.cosmo + b.startCosmo);
+    if (b.cosmoRate) p.cosmoMult *= 1 + b.cosmoRate;
+    if (b.draw) p.extraDraw = (p.extraDraw || 0) + b.draw;
+    if (b.vamp) p.vamp = (p.vamp || 0) + b.vamp;
+    if (b.crit) p.crit = (p.crit || 0) + b.crit;
+    if (b.relics) p.relics = (p.relics || []).concat(b.relics);
+  }
+  // ---- equipes: sinergias e reservas
+  const BRONZE = [0, 1, 2, 3, 4], GOLD = [5, 6, 7, 8, 9, 11, 12, 13, 15, 16, 18, 19];
+  const SWAP_COST = 10, TRAP_COST = 10, DISCARD_COSMO = 15, ASSIST = 6;
+  function synergies(ids) {
+    const out = [];
+    if (ids.length < 2) return out;
+    const allB = ids.every(i => BRONZE.includes(i)), allG = ids.every(i => GOLD.includes(i));
+    if (allB) out.push({ name: 'Amizade dos Bronzeiros', desc: '+15 Vida e +5 Defesa para todos', b: { life: 15, def: 5 } });
+    else if (allG) out.push({ name: 'Armadura de Ouro', desc: '+5 Força e +5 Defesa para todos', b: { att: 5, def: 5 } });
+    else if (ids.some(i => BRONZE.includes(i)) && ids.some(i => GOLD.includes(i))) out.push({ name: 'Aliança do Santuário', desc: '+10 Vida e +3 Força para todos', b: { life: 10, att: 3 } });
+    const has = i => ids.includes(i);
+    if (has(4) && has(2)) out.push({ name: 'Irmãos de Sangue', desc: 'Ikki e Shun: ao entrar em campo, recuperam 12 de vida', swapHeal: 12 });
+    if (has(8) && has(3)) out.push({ name: 'Mestre e Discípulo', desc: 'Camus e Hyoga: +4 Força para todos', b: { att: 4 } });
+    if (has(0) && has(1) && has(3)) out.push({ name: 'Os Três Heróis', desc: 'Seiya, Shiryu e Hyoga: +3 Força, +3 Defesa e +10 Vida', b: { att: 3, def: 3, life: 10 } });
+    return out;
+  }
+  const REC = ['charId', 'stats', 'stance', 'stanceChanged', 'debuffs', 'invalid', 'specialProb', 'specialInterval', 'specialCounter', 'camusApplied', 'cosmoMult'];
+  function takeRec(p) { const r = {}; REC.forEach(k => { r[k] = p[k]; }); return r; }
+  function putRec(p, r) { REC.forEach(k => { p[k] = r[k]; }); }
+  function buildTeam(G, p, ids, syn) {
+    const mk = id => { const q = newPlayer(id, p.idx); syn.forEach(sy => { if (sy.b) applyBonus(q, sy.b); }); return q; };
+    const lead = mk(ids[0]); putRec(p, takeRec(lead));
+    p.bench = ids.slice(1).map(id => takeRec(mk(id)));
+    p.teamIds = ids.slice();
+    p.swapHeal = syn.reduce((a, sy) => a + (sy.swapHeal || 0), 0);
+    G.syn[p.idx] = syn.map(sy => sy.name);
+  }
+  function newGame(c0, c1, first, opts) {
+    opts = opts || {};
     const G = { p: [newPlayer(c0, 0), newPlayer(c1, 1)], turn: first == null ? rint(0, 1) : first, totalTurn: 1,
-      over: false, winner: null, ev: [], seq: 0 };
+      over: false, winner: null, ev: [], seq: 0, mod: opts.mod || null, norage: !!opts.norage, syn: [[], []],
+      tr: Object.assign({ swap: 'free', assist: true, syn: true, last: false }, opts.tr || {}) };
+    G.wx = opts.wx || null;
+    [opts.t0, opts.t1].forEach((t, i) => { if (t && t.length) buildTeam(G, G.p[i], [i ? c1 : c0].concat(t), G.tr.syn ? synergies([i ? c1 : c0].concat(t)) : []); });
+    applyBonus(G.p[0], opts.b0); applyBonus(G.p[1], opts.b1);
+    if (G.wx === 'eclipse') G.p.forEach(p => { p.specialDisc = 25; });
+    if (G.mod === 'fragil') G.p.forEach(p => { p.stats.life = Math.max(1, Math.round(p.stats.maxLife * 0.6)); });
+    if (G.mod === 'furia') G.p.forEach(p => { p.stats.attPower += 10; });
+    if (G.mod === 'reserva') G.p.forEach(p => { p.stats.cosmo = Math.min(p.stats.maxCosmo, p.stats.cosmo + 60); });
+    { const n = Math.max((G.p[0].bench || []).length, (G.p[1].bench || []).length) + 1; G.dmgMult = n >= 3 ? 4 : n === 2 ? 2.8 : 0; }
     emit(G, { t: 'start' });
+    G.p.forEach(p => { (G.syn[p.idx] || []).forEach(n => emit(G, { t: 'text', p: p.idx, txt: 'SINERGIA: ' + n, kind: 'good' })); });
     draw(G, G.p[0], FIRST_DRAW, true); draw(G, G.p[1], FIRST_DRAW, true);
     emit(G, { t: 'turn', p: G.turn });
     return G;
@@ -66,7 +118,7 @@
     return G.p.map(p => {
       const s = cur(p);
       return { life: p.stats.life, maxLife: p.stats.maxLife, cosmo: p.stats.cosmo, maxCosmo: p.stats.maxCosmo,
-        att: s.attPower, def: s.defPower, stance: p.stance, hand: p.hand.length };
+        att: s.attPower, def: s.defPower, stance: p.stance, hand: p.hand.length, rage: Math.round(p.rage || 0), ult: !!p.ultUsed, sense: !!p.senseUsed, senseOn: !!p.senseOn, trap: !!p.trap };
     });
   }
   function emit(G, e) { e.hud = hud(G); e.n = ++G.seq; G.ev.push(e); }
@@ -116,16 +168,22 @@
     if (G.over || G.turn !== p.idx) return false;
     if (isBoss(p) && card.special && !mestreHalf(p)) return false;
     const req = card.statsRequired;
-    const mult = hasDebuff(p, d => d.isCosmicInterference) ? 2 : 1;
-    if (Math.round(p.stats.cosmo) < Math.abs(req.cosmo) * mult) return false;
+    if (Math.round(p.stats.cosmo) < costOf(p, card)) return false;
     if (p.stats.attPower < req.attPower) return false;
     if (p.stats.defPower < req.defPower) return false;
     return true;
   }
   function costOf(p, card) {
     const mult = hasDebuff(p, d => d.isCosmicInterference) ? 2 : 1;
-    return Math.abs(card.statsRequired.cosmo) * mult;
+    let c = Math.abs(card.statsRequired.cosmo) * mult;
+    if (card.special) c = Math.max(0, c - (p.specialDisc || 0) - (hasRelic(p, 'eterno') ? 20 : 0));
+    return c;
   }
+  const hasRelic = (p, id) => !!(p.relics && p.relics.includes(id));
+  // combos: ataques seguidos com cartas diferentes no mesmo turno
+  const comboStep = p => (p.comboN || 0) + 1;
+  const comboVal = (p, n) => 6 * n * (hasRelic(p, 'combo') ? 2 : 1);
+  function comboPeek(p, card) { return card.offensive && !card.special && p.lastOff && p.lastOff !== card.tittle ? comboVal(p, comboStep(p)) : 0; }
   function hasDebuff(p, f) { return p.debuffs.some(f); }
 
   // estimativa de dano mostrada na carta
@@ -133,7 +191,7 @@
     if (!card.offensive) return null;
     const t = other(G, p), a = cur(p), b = cur(t);
     const dmg = card.statsDamage;
-    let base = Math.abs(dmg.life);
+    let base = Math.abs(dmg.life) * (G.dmgMult || 1);
     if (card.desperateAttackBonus) {
       const r = p.stats.life / p.stats.maxLife; if (r < 0.25) base += 40; else if (r < 0.5) base += 20;
     }
@@ -144,6 +202,8 @@
     d -= p.charId === ID.SHURA ? clamp(b.defPower - 10, 0, 9999) : b.defPower;
     if (p.charId === ID.AIORIA && d > 0) d *= 1.1;
     if (t.charId === ID.SHIRYU && d <= 10) d = 0;
+    if (G.wx === 'vento' && d > 0) d += 4;
+    d += comboPeek(p, card);
     if (t.charId === ID.MESTRE && d > 0) d = Math.max(0, d - 8);
     let hits = (p.charId === ID.SEIYA || p.charId === ID.SEIYASAG) && card.special ? 5 : 1;
     return Math.max(0, Math.round(d)) * hits;
@@ -152,11 +212,18 @@
   // PlayerManager.DealDamage
   function dealDamage(G, target, attacker, dmg, useDef) {
     const a = cur(attacker), t = cur(target);
-    let d = Math.abs(dmg.life) + (useDef ? a.defPower : a.attPower);
+    let d = Math.abs(dmg.life) + (useDef ? a.defPower : a.attPower) + (attacker.comboBonus || 0);
     d -= attacker.charId === ID.SHURA ? clamp(t.defPower - 10, 0, 9999) : t.defPower;
     if (attacker.charId === ID.AIORIA && d > 0) d += d * 0.1;
+    if (G.wx === 'vento' && d > 0) d += 4;
     if (target.charId === ID.SHIRYU && d <= 10) { if (d > 0) emit(G, { t: 'text', p: target.idx, txt: 'ESCUDO DO DRAGÃO', kind: 'block' }); d = 0; }
     if (target.charId === ID.MESTRE && d > 0) { d = Math.max(0, d - 8); emit(G, { t: 'passive', p: target.idx }); }
+    if (d > 0) {
+      const cc = (G.mod === 'critico' ? 0.2 : 0) + (attacker.crit || 0);
+      if (cc > 0 && Math.random() < cc) { d = Math.round(d * 1.5); emit(G, { t: 'text', p: target.idx, txt: 'CRÍTICO!', kind: 'good', crit: true }); }
+    }
+    if (d > 0 && hasRelic(target, 'ferro')) d = Math.max(0, d - 3);
+    if (d > 0 && hasRelic(target, 'ultima') && !target.ultimaUsed && target.stats.life - d <= 0) { d = Math.max(0, target.stats.life - 1); target.ultimaUsed = true; emit(G, { t: 'text', p: target.idx, txt: 'ÚLTIMA CHANCE!', kind: 'good' }); }
     if (d > 0) {
       for (const db of target.debuffs) if (db.isDamageConversion) db.conversionDamageTotal = (db.conversionDamageTotal || 0) + d;
       target.stats.life = clamp(target.stats.life - d, 0, target.stats.maxLife);
@@ -169,6 +236,12 @@
     target.stats.attPower = Math.max(0, target.stats.attPower + side.attPower);
     target.stats.defPower = Math.max(0, target.stats.defPower + side.defPower);
     statText(G, target, side);
+    if (d > 0 && !G.over && !G.norage) {
+      target.rage = Math.min(100, (target.rage || 0) + d * (hasRelic(target, 'chama') ? 2 : 1));
+      if (attacker !== target) attacker.rage = Math.min(100, (attacker.rage || 0) + d * 0.3 * (hasRelic(attacker, 'chama') ? 2 : 1));
+    }
+    if (d > 0 && attacker !== target && hasRelic(target, 'espinhos')) updateStats(G, attacker, { life: -Math.max(1, Math.round(d * 0.25)) }, true);
+    if (d > 0 && attacker.vamp) updateStats(G, attacker, { life: Math.max(1, Math.round(d * attacker.vamp)) }, true);
     if (d > 0) { tookDamage(G, target, attacker); doneDamage(G, attacker, target); }
     return d > 0;
   }
@@ -293,6 +366,14 @@
     const card = clone(cardOf(p, p.hand[hi].ref));
     if (!isUsable(G, p, card)) return false;
     p.hand.splice(hi, 1);
+    p.comboBonus = 0;
+    if (card.offensive && !card.special) {
+      if (p.lastOff && p.lastOff !== card.tittle) {
+        p.comboN = comboStep(p); p.comboBonus = comboVal(p, p.comboN);
+        emit(G, { t: 'text', p: pi, txt: 'COMBO x' + p.comboN + '! +' + p.comboBonus, kind: 'good', combo: true });
+      } else p.comboN = 0;
+      p.lastOff = card.tittle;
+    }
     const cost = costOf(p, card);
     p.stats.cosmo = clamp(p.stats.cosmo - cost, 0, p.stats.maxCosmo);
     emit(G, { t: 'play', p: pi, ref: card.special ? 'S' : card.idx, charId: p.charId, title: card.tittle, special: !!card.special, cost });
@@ -310,12 +391,20 @@
       else defensive(G, p, t, card);
     } else if (card.offensive) offensive(G, p, t, card);
     else defensive(G, p, t, card);
+    p.comboBonus = 0;
+    if (!card.offensive && hasRelic(p, 'egide') && !G.over) updateStats(G, p, { life: 12 }, true);
     checkOver(G);
     return true;
   }
 
   // AttacksManager.UpdateOfensiveCardStatsRoutine
   function offensive(G, p, t, card, skipEffect) {
+    if (t.trap) {
+      const tc = t.trap.card; t.trap = null;
+      emit(G, { t: 'trap', p: t.idx, set: false });
+      emit(G, { t: 'text', p: t.idx, txt: 'ARMADILHA: ' + tc.tittle.toUpperCase() + '!', kind: 'counter' });
+      defensive(G, t, p, tc);
+    }
     if (card.isCounterable !== 0) {
       const c = t.debuffs.find(d => d.isCounterAttack);
       if (c) {
@@ -344,6 +433,7 @@
       }
     }
     const dmg = clone(card.statsDamage);
+    if (G.dmgMult) dmg.life *= G.dmgMult;
     if (card.desperateAttackBonus) {
       const r = p.stats.life / p.stats.maxLife;
       if (r < 0.25) dmg.life -= 40; else if (r < 0.5) dmg.life -= 20;
@@ -387,6 +477,14 @@
   function checkOver(G) {
     if (G.over) return;
     G.p.forEach(p => { if (p.stance === 0) mestreAuto(G, p); });
+    G.p.forEach(p => {
+      if (p.stats.life > 0 || !p.bench) return;
+      const bi = p.bench.findIndex(b => b.stats.life > 0);
+      if (bi >= 0) {
+        emit(G, { t: 'text', p: p.idx, txt: 'DERROTADO!', kind: 'fail' }); doSwap(G, p, bi, true);
+        if (G.tr.last && !p.bench.some(b => b.stats.life > 0)) { updateStats(G, p, { attPower: 8, defPower: 8 }, true); emit(G, { t: 'text', p: p.idx, txt: 'ÚLTIMO CAVALEIRO!', kind: 'good' }); }
+      }
+    });
     const dead = G.p.filter(p => p.stats.life <= 0);
     if (!dead.length) return;
     G.over = true;
@@ -458,19 +556,23 @@
     if (G.over || G.turn !== pi) return false;
     const p = G.p[pi];
     turnDebuffs(G, p, false); if (G.over) return true;
+    if (p.senseOn && p.sense <= 0) { p.senseOn = false; updateStats(G, p, { attPower: -SENSE_BONUS, defPower: -SENSE_BONUS }, false); emit(G, { t: 'text', p: p.idx, txt: 'Sétimo Sentido acabou', kind: 'fail' }); }
     if (p.charId === ID.SHAKA) { if (removeOneNegative(G, p)) emit(G, { t: 'passive', p: p.idx }); }
     const extra = p.debuffs.some(d => d.isGetExtraTurn);
     if (!extra) G.turn = 1 - G.turn; else emit(G, { t: 'text', p: p.idx, txt: 'TURNO EXTRA!', kind: 'good', sfx: 'sfx_velocidade_da_luz2' });
     const n = G.p[G.turn];
-    n.stanceChanged = false; n.camusApplied = false; G.p[1 - G.turn].camusApplied = false;
+    n.lastOff = null; n.comboN = 0; n.discarded = false; n.swapped = false; n.stanceChanged = false; n.camusApplied = false; G.p[1 - G.turn].camusApplied = false;
     emit(G, { t: 'turn', p: G.turn });
     const round = Math.floor(G.totalTurn / 2);
+    const senseNow = n.sense > 0; if (senseNow) n.sense--;
     if (round > 0) {
-      if (n.debuffs.some(d => d.isCancelCosmoGeneration)) emit(G, { t: 'text', p: n.idx, txt: 'Sem geração de cosmo!', kind: 'fail' });
+      if (senseNow) emit(G, { t: 'text', p: n.idx, txt: 'Sétimo Sentido: sem cosmo', kind: 'good' });
+      else if (n.debuffs.some(d => d.isCancelCosmoGeneration)) emit(G, { t: 'text', p: n.idx, txt: 'Sem geração de cosmo!', kind: 'fail' });
       else {
         const st = n.stats;
         let gain = st.cosmoGainedPerTurn * st.maxCosmo * st.cosmoMultiplierPerTurn * round * n.cosmoMult;
         if (n.charId === ID.HYOGA) gain *= 1.2;
+        if (G.mod === 'dobro') gain *= 2;
         updateStats(G, n, { cosmo: gain }, false);
         emit(G, { t: 'cosmo', p: n.idx, v: gain });
       }
@@ -478,8 +580,14 @@
     turnDebuffs(G, n, true); if (G.over) return true;
     mestreAuto(G, n);
     if (n.charId === ID.IKKI && n.stats.life < n.stats.maxLife) { emit(G, { t: 'passive', p: n.idx }); updateStats(G, n, { life: 10 }, true); }
-    let draws = DRAWS_PER_TURN + n.debuffs.reduce((a, d) => a + (d.drawCardBuff || 0), 0);
-    if (draws < DRAWS_PER_TURN) emit(G, { t: 'text', p: n.idx, txt: draws <= 0 ? 'Não saca cartas!' : 'Saca ' + draws + ' carta', kind: 'fail' });
+    if (G.wx === 'estrelas') { updateStats(G, n, { cosmo: 8 }, false); emit(G, { t: 'cosmo', p: n.idx, v: 8 }); }
+    if (G.wx === 'tempestade' && G.totalTurn > 1 && G.totalTurn % 6 === 0) {
+      emit(G, { t: 'weather', wx: 'tempestade' });
+      G.p.forEach(q => updateStats(G, q, { life: -15 }, true)); checkOver(G); if (G.over) return true;
+    }
+    if (G.mod === 'regen' && n.stats.life < n.stats.maxLife) updateStats(G, n, { life: 8 }, true);
+    let draws = DRAWS_PER_TURN + (G.mod === 'compra' ? 1 : 0) + (n.extraDraw || 0) + n.debuffs.reduce((a, d) => a + (d.drawCardBuff || 0), 0);
+    if (draws < DRAWS_PER_TURN && !(G.mod === 'compra' || n.extraDraw)) emit(G, { t: 'text', p: n.idx, txt: draws <= 0 ? 'Não saca cartas!' : 'Saca ' + draws + ' carta', kind: 'fail' });
     draw(G, n, Math.max(0, draws));
     updatePassiveDurations(G.p[0]); updatePassiveDurations(G.p[1]);
     G.totalTurn++;
@@ -487,16 +595,102 @@
     return true;
   }
 
+  // troca de cavaleiro (equipe): o cosmo é compartilhado
+  function doSwap(G, p, bi, forced) {
+    const out = takeRec(p), inn = p.bench[bi], cosmo = p.stats.cosmo;
+    p.bench[bi] = out; putRec(p, inn);
+    p.stats.cosmo = clamp(cosmo, 0, p.stats.maxCosmo);
+    emit(G, { t: 'swap', p: p.idx, charId: p.charId, forced: !!forced });
+    if (p.swapHeal && !forced && p.stats.life < p.stats.maxLife) updateStats(G, p, { life: p.swapHeal }, true);
+  }
+  const swapCost = G => (G.tr.swap === 'gratis' ? 0 : SWAP_COST);
+  function swapTo(G, pi, bi) {
+    const p = G.p[pi], t = other(G, p);
+    if (G.over || G.turn !== pi || !p.bench || p.swapped || !p.bench[bi] || p.bench[bi].stats.life <= 0 || G.tr.swap === 'fall') return false;
+    const sc = swapCost(G);
+    if (Math.round(p.stats.cosmo) < sc) return false;
+    p.stats.cosmo = clamp(p.stats.cosmo - sc, 0, p.stats.maxCosmo);
+    p.swapped = true;
+    doSwap(G, p, bi, false);
+    if (G.tr.assist) { emit(G, { t: 'text', p: pi, txt: 'ASSISTÊNCIA!', kind: 'good' }); dealDamage(G, t, p, { life: -ASSIST }, false); }
+    checkOver(G);
+    return true;
+  }
+  // armadilha: carta de defesa/utilidade (não ataque, custo > 0) virada pelo DOBRO do custo; quando o inimigo ataca, o efeito da carta é ativado como está escrito
+  const trapOk = (p, card) => !card.special && !card.offensive && costOf(p, card) > 0;
+  const trapCost = (p, card) => costOf(p, card) * 2;
+  function setTrap(G, pi, uid) {
+    const p = G.p[pi];
+    if (G.over || G.turn !== pi || p.trap) return false;
+    const hi = p.hand.findIndex(h => h.uid === uid); if (hi < 0 || p.hand[hi].ref === 'S') return false;
+    const card = clone(cardOf(p, p.hand[hi].ref));
+    if (!trapOk(p, card) || Math.round(p.stats.cosmo) < trapCost(p, card)) return false;
+    p.hand.splice(hi, 1);
+    p.stats.cosmo = clamp(p.stats.cosmo - trapCost(p, card), 0, p.stats.maxCosmo);
+    p.trap = { card, title: card.tittle };
+    emit(G, { t: 'trap', p: pi, set: true, title: card.tittle });
+    return true;
+  }
+  function discardCard(G, pi, uid) {
+    const p = G.p[pi];
+    if (G.over || G.turn !== pi || p.discarded) return false;
+    const hi = p.hand.findIndex(h => h.uid === uid); if (hi < 0 || p.hand[hi].ref === 'S') return false;
+    p.hand.splice(hi, 1); p.discarded = true;
+    emit(G, { t: 'discard', p: pi });
+    updateStats(G, p, { cosmo: DISCARD_COSMO }, true);
+    return true;
+  }
+
+  // Cosmo Final: golpe único por luta, liberado quando a barra de fúria enche
+  function ultimate(G, pi) {
+    const p = G.p[pi], t = other(G, p);
+    if (G.over || G.norage || G.turn !== pi || p.ultUsed || (p.rage || 0) < 100) return false;
+    p.ultUsed = true; p.rage = 0;
+    emit(G, { t: 'ult', p: pi, charId: p.charId });
+    dealDamage(G, t, p, { life: -45 }, false);
+    updateStats(G, p, { life: 20 }, true);
+    checkOver(G);
+    return true;
+  }
+
+  // Sétimo Sentido: 2 turnos sem gerar cosmo, em troca de +Força e +Defesa
+  const SENSE_BONUS = 10;
+  function seventhSense(G, pi) {
+    const p = G.p[pi];
+    if (G.over || G.norage || G.turn !== pi || p.senseUsed || p.senseOn || (p.rage || 0) < 100) return false;
+    p.senseUsed = true; p.senseOn = true; p.sense = 2; p.rage = 0;
+    emit(G, { t: 'sense', p: pi, charId: p.charId });
+    updateStats(G, p, { attPower: SENSE_BONUS, defPower: SENSE_BONUS }, true);
+    return true;
+  }
+
   // ------------------------------------------------------------------ IA (CPU)
   function aiStep(G, pi) {
     const p = G.p[pi], t = other(G, p);
     if (G.over || G.turn !== pi) return null;
+    if ((p.rage || 0) >= 100) {
+      if (!p.senseUsed && !p.senseOn && (p.ultUsed || (t.stats.life > 75 && Math.random() < 0.4))) return { type: 'sense' };
+      if (!p.ultUsed) return { type: 'ult' };
+    }
     if (!p.stanceChanged && !isBoss(p)) {
       const lifeR = p.stats.life / p.stats.maxLife;
       let want = p.stance;
       if (lifeR < 0.35) want = 2; else if (p.stats.cosmo >= 60 || t.stats.life / t.stats.maxLife < 0.4) want = 1;
       else if (Math.random() < 0.3) want = rint(0, 2);
       if (want !== p.stance) return { type: 'stance', s: want };
+    }
+    if (p.bench && !p.swapped && G.tr.swap !== 'fall' && p.stats.life < p.stats.maxLife * 0.3 && p.stats.cosmo >= swapCost(G)) {
+      let bi = -1, bl = 0; p.bench.forEach((b, i) => { if (b.stats.life > bl && b.stats.life > b.stats.maxLife * 0.4) { bl = b.stats.life; bi = i; } });
+      if (bi >= 0) return { type: 'swap', i: bi };
+    }
+    const normals = p.hand.filter(h => h.ref !== 'S');
+    if (!p.discarded && p.stats.cosmo < 25 && p.hand.length >= 5) {
+      const bad = normals.find(h => !isUsable(G, p, cardOf(p, h.ref)));
+      if (bad) return { type: 'discard', uid: bad.uid };
+    }
+    if (!p.trap && p.hand.length >= 5 && Math.random() < 0.3) {
+      let lo = null, ls = 1e9; normals.forEach(h => { const c = cardOf(p, h.ref); if (!trapOk(p, c) || p.stats.cosmo < trapCost(p, c) + 20) return; const sc = aiScore(G, p, t, c); if (sc < ls) { ls = sc; lo = h; } });
+      if (lo) return { type: 'trap', uid: lo.uid };
     }
     let best = null, bestScore = 0;
     for (const h of p.hand) {
@@ -541,6 +735,6 @@
     }
   }
 
-  window.Engine = { newGame, playCard, setStance, endTurn, aiStep, isUsable, costOf, estimate, cardOf, cardDesc, cur,
+  window.Engine = { trapOk, trapCost, swapCost, synergies, swapTo, setTrap, discardCard, SWAP_COST, TRAP_COST, DISCARD_COSMO, newGame, playCard, setStance, endTurn, ultimate, seventhSense, aiStep, isUsable, costOf, estimate, cardOf, cardDesc, cur,
     charById, ID, MAX_HAND, D };
 })();

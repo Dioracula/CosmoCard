@@ -19,12 +19,15 @@
     <div class="menubtns">
       <button class="imgbtn" data-img="b_santuario" data-act="santuario" aria-label="Santuário"></button>
       <button class="imgbtn" data-img="b_solo" data-act="cpu" aria-label="Solo"></button>
+      <button class="imgbtn" data-img="b_torre" data-act="torre" aria-label="Torre"></button>
+      <button class="imgbtn" data-img="b_missoes" data-act="missoes" aria-label="Missões"><b class="mbadge"></b></button>
       <button class="imgbtn" data-img="b_online" data-act="online" aria-label="Online"></button>
       <button class="imgbtn" data-img="b_cartas" data-act="cards" aria-label="Cartas"></button>
     </div>
     <div class="menuicons">
+      <button class="xbtn" data-act="chefe">👑 CHEFE</button>
       <button class="imgbtn round" data-img="b_info" data-act="help" aria-label="Como jogar"></button>
-      <button class="imgbtn round snd" data-img="b_opt" data-act="mute" aria-label="Som"></button>
+      <button class="imgbtn round snd" data-img="b_opt" data-act="opt" aria-label="Opções"></button>
       <div class="icon" data-act="fs" title="Tela cheia">⛶</div>
     </div>
     <button class="dbgbtn" data-act="debug">DEBUG</button>
@@ -40,6 +43,7 @@
     <div class="selplate l"><span></span></div><div class="selplate r"><span></span></div>
     <div class="grid"></div>
     <div class="selinfo"></div>
+    <button class="btn small teamsel" data-act="teamN" style="display:none"></button>
     <div class="selbtns"><button class="imgbtn" data-img="b_voltar" data-act="back" aria-label="Voltar"></button><button class="imgbtn" data-img="b_avancar" data-act="confirm" aria-label="Avançar"></button></div>
     <div class="borda l"></div><div class="borda r"></div>
   </section>
@@ -101,6 +105,33 @@
         <div class="row"><button class="btn small" data-act="share">Compartilhar</button><button class="btn small ghost" data-act="copy">Copiar</button></div>
         <div class="row"><div class="spin"></div><span class="note" id="onStatus">Aguardando seu amigo entrar…</span></div>
       </div>
+      <div class="card-panel" id="onRules" style="display:none;min-width:700px">
+        <b style="font-size:20px;color:var(--gold)">Tipo de jogo da sala</b>
+        <div class="presets">
+          <button class="btn small ghost" data-act="preset" data-p="clas">Clássico</button><button class="btn small ghost" data-act="preset" data-p="sorteio">Sorteio</button>
+          <button class="btn small ghost" data-act="preset" data-p="epica">Batalha Épica</button><button class="btn small ghost" data-act="preset" data-p="bo3">Melhor de 3</button>
+          <button class="btn small ghost" data-act="preset" data-p="draft">Draft</button><button class="btn small ghost" data-act="preset" data-p="semfuria">Sem Fúria</button>
+          <button class="btn small ghost" data-act="preset" data-p="zod">Só Zodíacos</button><button class="btn small ghost" data-act="preset" data-p="bronze">Só Bronzes</button>
+          <button class="btn small ghost" data-act="preset" data-p="torre">Torre a dois</button>
+          <button class="btn small ghost" data-act="preset" data-p="dupla">Dupla</button><button class="btn small ghost" data-act="preset" data-p="trio">Trio</button>
+          <button class="btn small ghost" data-act="preset" data-p="trioduro">Trio Sobrevivência</button>
+        </div>
+        <div class="rgrid">
+          <label>Formato<select id="rFmt"><option value="single">Luta única</option><option value="bo3">Melhor de 3</option><option value="tower">Torre a dois (corrida)</option></select></label>
+          <label>Escolha<select id="rPick"><option value="free">Livre</option><option value="mirror">Espelho proibido</option><option value="draft">Draft (um escolhe depois do outro)</option></select></label>
+          <label>Evento<select id="rMod"></select></label>
+          <label>Clima<select id="rWx"></select></label>
+          <label>Vida e cosmo<select id="rEpic"><option value="0">Normal</option><option value="1">Batalha Épica (+100 vida, +30 cosmo)</option></select></label>
+          <label>Fúria<select id="rRage"><option value="1">Ligada</option><option value="0">Desligada (sem Cosmo Final)</option></select></label>
+          <label>Equipe<select id="rTeam"><option value="1">Solo (1 cavaleiro)</option><option value="2">Dupla</option><option value="3">Trio</option></select></label>
+          <label>Troca<select id="rSwap"><option value="free">Livre (1x por turno, 10 cosmo)</option><option value="gratis">Livre e grátis (1x por turno)</option><option value="fall">Só quando o cavaleiro cai</option></select></label>
+          <label>Assistência na troca<select id="rAssist"><option value="1">Ligada (golpe ao entrar)</option><option value="0">Desligada</option></select></label>
+          <label>Sinergias<select id="rSyn"><option value="1">Ligadas</option><option value="0">Desligadas</option></select></label>
+          <label>Último Cavaleiro<select id="rLast"><option value="0">Desligado</option><option value="1">Ligado (+8 Força/Defesa ao último vivo)</option></select></label>
+          <label>Personagens<select id="rFilter"><option value="all">Todos</option><option value="zod">Só Zodíacos</option><option value="bronze">Só Bronzes</option></select></label>
+        </div>
+        <div class="note" id="rSum"></div>
+      </div>
       <div class="note" id="onMsg"></div>
       <button class="imgbtn" data-img="b_voltar" data-act="back" aria-label="Voltar" style="width:230px;height:55px"></button>
     </div>
@@ -112,17 +143,18 @@
     <div class="bg" data-bg="bg_battle"></div>
     <div class="fighter me"><div class="shadow"></div><div class="faura"><i class="c1"></i><canvas width="520" height="700"></canvas></div><img alt=""></div>
     <div class="fighter op"><div class="shadow"></div><div class="faura"><i class="c1"></i><canvas width="520" height="700"></canvas></div><img alt=""></div>
-    <div id="fxdim"></div><canvas id="fxc"></canvas>
-    <div class="hud me" data-side="me"><img class="frame" alt=""><div class="glass"><img alt=""><span></span></div>
+    <div id="wx"></div><div id="fxdim"></div><canvas id="fxc"></canvas>
+    <div class="hud me" data-side="me"><img class="frame" alt=""><div class="rage" data-act="ult"><i></i><b></b></div><div class="glass"><img alt=""><span></span></div>
       <div class="bar"><div class="fill"></div><span></span></div><button class="plate" data-side="me"><img alt=""><span></span></button>
       <div class="nm"></div><div class="effs"></div></div>
-    <div class="hud op" data-side="op"><img class="frame" alt=""><div class="glass"><img alt=""><span></span></div>
+    <div class="hud op" data-side="op"><img class="frame" alt=""><div class="rage"><i></i><b></b></div><div class="glass"><img alt=""><span></span></div>
       <div class="bar"><div class="fill"></div><span></span></div><button class="plate" data-side="op"><img alt=""><span></span></button>
       <div class="nm"></div><div class="effs"></div></div>
+    <div class="bench me" data-side="me"></div><div class="bench op" data-side="op"></div>
     <div class="pd me" data-side="me"><img data-src="powdef" alt=""><span class="def"></span><span class="att"></span><button class="star" data-img="b_passiva" aria-label="Passiva"></button></div>
     <div class="pd op" data-side="op"><img data-src="powdef" alt=""><span class="def"></span><span class="att"></span><button class="star" data-img="b_passiva" aria-label="Passiva"></button></div>
     <div class="topmid"><button class="imgbtn" data-img="b_menu" data-act="quit" aria-label="Menu" style="width:150px;height:54px"></button>
-      <button class="endturn" data-act="end" aria-label="Finalizar turno"></button><div class="turninfo"></div></div>
+      <button class="endturn" data-act="end" aria-label="Finalizar turno"></button><div class="turninfo"></div><button class="modtag" data-act="modinfo"></button><button class="modtag wxt" data-act="wxinfo"></button></div>
     <div class="ophand"></div>
     <img class="rail" data-src="rail" alt=""><img class="railtop" data-src="rail_top" alt="">
     <div class="logline"></div>
@@ -133,7 +165,7 @@
     <div class="flash"></div>
     <div class="mreveal"><b>O MESTRE DESPERTA</b><span>Sua verdadeira forma é revelada</span></div>
     <div class="borda l"></div><div class="borda r"></div>
-    <div class="icon sndb" data-act="mute">♪</div>
+    <div class="icon sndb" data-act="opt">⚙</div>
   </section>
 
   <!-- AJUDA -->
@@ -143,7 +175,7 @@
 
   <div class="modal" id="mZoom"><div class="zoomwrap"><div class="zoom"><div class="cost"></div><div class="dmg"></div></div>
     <div class="zinfo"><h3></h3><div class="ty"></div><div class="kv"></div><p></p><div class="warn"></div>
-      <div class="row"><button class="btn small" data-act="use">Usar carta</button><button class="btn small ghost" data-act="close">Fechar</button></div></div></div></div>
+      <div class="row"><button class="btn small" data-act="use">Usar carta</button><button class="btn small" data-act="trapcard" id="zTrap">Armadilha</button><button class="btn small" data-act="discardcard" id="zDisc">Descartar</button><button class="btn small ghost" data-act="close">Fechar</button></div></div></div></div>
   <div class="modal" id="mStance"><div class="card-panel"><h3 style="margin:0;color:var(--gold);font-size:26px">Posição de combate</h3>
     <div class="note">Muda Força/Defesa e o tipo de carta que você mais recebe. Uma troca por turno.</div><div class="stopts"></div>
     <button class="btn small ghost" data-act="close">Fechar</button></div></div>
@@ -164,6 +196,25 @@
     <div class="row"><button class="btn small" data-act="saveexp">Baixar arquivo</button><button class="btn small" data-act="saveimp">Abrir arquivo</button></div>
     <input type="file" id="saveFile" accept=".json,.txt,application/json,text/plain" style="display:none">
     <button class="btn small ghost" data-act="close">Fechar</button></div></div>
+  <div class="modal" id="mTower"><div class="card-panel tw"><h3 class="ttl"></h3><div class="twbody"></div><div class="row twbtns"></div></div></div>
+  <div class="modal" id="mMis"><div class="card-panel mis"><h3 style="margin:0;color:var(--gold);font-size:26px">Missões e Conquistas</h3>
+    <div class="misrank"></div><div class="mislist"></div><h4 class="mish">Conquistas</h4><div class="achlist"></div>
+    <button class="btn small ghost" data-act="close">Fechar</button></div></div>
+  <div class="modal" id="mUlt"><div class="card-panel" style="max-width:680px"><h3 style="margin:0;color:var(--gold);font-size:26px">Fúria cheia! Escolha o poder</h3>
+    <div class="twbody"><div><b style="color:#ffcf40">Cosmo Final</b> — golpe único: 45 de dano + sua Força e cura 20 de vida.</div>
+    <div><b style="color:#9fe8ff">Sétimo Sentido</b> — por 2 turnos você não gera cosmo, mas ganha +10 de Força e +10 de Defesa.</div>
+    <div style="color:#aaa;font-size:14px">Cada poder pode ser usado uma vez por luta.</div></div>
+    <div class="row"><button class="btn small" data-act="ultgo">Cosmo Final</button><button class="btn small" data-act="sensego">Sétimo Sentido</button><button class="btn small ghost" data-act="close">Cancelar</button></div></div></div>
+  <div class="modal" id="mTeam"><div class="card-panel rgrid" style="min-width:560px;display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;color:var(--gold);font-size:26px">Opções de equipe</h3>
+    <label>Tamanho<select id="tTeam"><option value="1">Solo (1 cavaleiro)</option><option value="2">Dupla</option><option value="3">Trio</option></select></label>
+    <label>Troca<select id="tSwap"><option value="free">Livre (1x por turno, 10 cosmo)</option><option value="gratis">Livre e grátis (1x por turno)</option><option value="fall">Só quando o cavaleiro cai</option></select></label>
+    <label>Assistência na troca<select id="tAssist"><option value="1">Ligada (golpe ao entrar)</option><option value="0">Desligada</option></select></label>
+    <label>Sinergias<select id="tSyn"><option value="1">Ligadas</option><option value="0">Desligadas</option></select></label>
+    <label>Último Cavaleiro<select id="tLast"><option value="0">Desligado</option><option value="1">Ligado (+8 Força/Defesa ao último vivo)</option></select></label>
+    <div class="note" id="tSum"></div><button class="btn small" data-act="teamok">Pronto</button></div></div>
+  <div class="modal" id="mOpt"><div class="card-panel" style="min-width:420px"><h3 style="margin:0;color:var(--gold);font-size:26px">Opções</h3>
+    <button class="btn" data-act="mute" id="optMusic"></button><button class="btn" data-act="sfx" id="optSfx"></button><button class="btn" data-act="fs" id="optFs"></button>
+    <button class="btn small ghost" data-act="close">Fechar</button></div></div>
   <div class="toast" id="toast"></div>
 </div></div>
 <!--SCRIPTS-->
@@ -172,6 +223,7 @@
 <script src="engine.js"></script>
 <script src="net.js"></script>
 <script src="fx.js"></script>
+<script src="modes.js"></script>
 <script src="ui.js"></script>
 <!--/SCRIPTS-->
 </body>

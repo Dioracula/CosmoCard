@@ -5,7 +5,7 @@ window.FX = (function () {
   const imgs = {}, tintCache = {};
   const SHEETS = { impact6: [4, 4, 16], hitice: [4, 4, 16], firehit: [4, 4, 16], core01: [4, 4, 16], core03: [4, 4, 16], proj03: [4, 4, 16],
     proj07: [4, 4, 16], lightsub: [4, 4, 16], icesmoke: [4, 4, 16], dust: [4, 4, 16], wind05: [4, 4, 16], spark1: [4, 4, 16],
-    elec: [7, 1, 7], fireball: [2, 1, 2], shieldbr: [2, 1, 2], flare02: [4, 2, 8] };
+    elec: [7, 1, 7], fireball: [2, 1, 2], shieldbr: [2, 1, 2], flare02: [4, 2, 8], dragonsheet: [4, 2, 8] };
   const R = (a, b) => a + Math.random() * (b - a);
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -156,11 +156,17 @@ window.FX = (function () {
     },
     async seiyasag(A, B, d) { return SPECIALS.seiya(A, B, d, true); },
     async shiryu(A, B, d) {
-      aura(A, '#5dff9e', 1.4); await wait(350);
-      add({ k: 'wind05', x: A[0], y: A[1], w: 380, life: 0.9, color: '#5dff9e', fps: 20 });
-      proj('dragon', [A[0], A[1] - 40], [B[0], B[1] - 30], 0.75, { w: 560, s: 0.45, s1: 1.15, sx: -d, rot: 0, color: '#7dffb0', fin: 0.15, fout: 0.2 });
-      for (let i = 0; i < 18; i++) setTimeout(() => sparks([A[0] + (B[0] - A[0]) * i / 18, A[1] - 20], '#7dffb0', 3, 120), i * 38);
-      await wait(700); hit(B, '#7dffb0', 1.4); shake(9, 0.4); flash('#3dff8a', 0.3, 0.4); await wait(300);
+      aura(A, '#5dff9e', 1.2); await wait(300);
+      // o dragão nasce no chão do inimigo e sobe, crescendo (8 quadros da folha original)
+      const fy = B[1] + 480, cw = 384, ch = 512, life = 1.5, sc0 = 1.0, sc1 = 1.3;
+      ring('circlelight', [B[0], B[1] + 250], 0.2, 1.4, 0.9, '#5dff9e', { vr: 2 });
+      glow([B[0], B[1] + 240], '#5dff9e', 420, 1.1);
+      // folha sobre fundo preto: mistura aditiva (preto = transparente)
+      add({ k: 'dragonsheet', x: B[0], y: fy, w: cw, h: ch, s: sc0, s1: sc1, life, fps: 8 / (life * 0.8), blend: 'lighter', fin: 0.12, fout: 0.3,
+        onUpdate: p => { const f = Math.min(1, Math.max(0, p.t / p.life)); const s = sc0 + (sc1 - sc0) * f; p.y = fy - 40 - (ch * s) / 2 - 200 * f * f; } });
+      for (let i = 0; i < 22; i++) setTimeout(() => sparks([B[0] + R(-80, 80), fy - 40 - i * 26], '#7dffb0', 3, 140), i * 45);
+      await wait(900); hit([B[0], B[1] - 40], '#7dffb0', 1.5); ring('shock', B, 0.3, 2.4, 0.7, '#7dffb0'); shake(10, 0.5); flash('#3dff8a', 0.3, 0.45);
+      await wait(700);
     },
     async shun(A, B, d) {
       glow(A, '#ff8be0', 260, 0.9);
