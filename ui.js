@@ -348,6 +348,64 @@
   function fighterEl(pi) { return $('#battle .fighter.' + sideOf(pi)); }
   const chest = pi => [centerOf(pi)[0], 330];
   const dir = pi => sideOf(pi) === 'me' ? 1 : -1;
+  // aura de cosmo em volta do personagem: cor por personagem, intensidade pelo cosmo acumulado
+  const AURA = { seiya: '235,252,255|140,225,255|50,160,225', shiryu: '170,255,190|30,215,100|8,120,50', ikki: '255,225,150|255,135,20|190,50,0',
+    shun: '255,190,240|205,90,255|110,40,190', hyoga: '70,170,255|20,90,255|8,40,210', gold: '255,243,176|255,200,60|200,135,0', dark: '150,70,230|60,15,110|10,0,20' };
+  const auraKey = (p, stance) => { const k = CH[p.charId].key; if (k === 'mestre') return stance ? 'dark' : 'gold'; return AURA[k] ? k : 'gold'; };
+
+  // fumaça de energia + raios verticais do cosmo (canvas atrás do personagem)
+  const auraSys = (() => {
+    const R = (a, b) => a + Math.random() * (b - a), S = [];
+    ['me', 'op'].forEach(side => { const f = document.querySelector('#battle .fighter.' + side), cv = f && f.querySelector('.faura canvas'); if (cv) S.push({ f, cv, g: cv.getContext('2d'), pu: [], st: [], acc: 0, acc2: 0 }); });
+    let last = 0;
+    const col = (f, n) => (f.style.getPropertyValue(n) || '255,243,176').trim();
+    function step(now) {
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      S.forEach(s => {
+        const { f, g, cv } = s, on = f.classList.contains('c-on'), k = parseFloat(f.style.getPropertyValue('--k')) || 0;
+        g.clearRect(0, 0, cv.width, cv.height);
+        if (!on && !s.pu.length && !s.st.length) return;
+        const ca = col(f, '--ca'), cb = col(f, '--cb'), cd = col(f, '--cd'), W = cv.width, H = cv.height;
+        if (on) {
+          s.acc += dt * (6 + k * 26); while (s.acc > 1) { s.acc--; s.pu.push({ x: W / 2 + R(-130, 130) * (0.6 + k * 0.5), y: H - R(20, 120), vy: -R(60, 130) * (0.8 + k), r: R(50, 100) * (0.7 + k * 0.5), t: 0, life: R(1.1, 2), c: Math.random() < 0.5 ? ca : cb, d: Math.random() * 6 }); }
+          s.acc2 += dt * (3 + k * 16); while (s.acc2 > 1) { s.acc2--; s.st.push({ x: W / 2 + R(-190, 190) * (0.5 + k * 0.6), y: H - R(0, 160), vy: -R(260, 520) * (0.7 + k * 0.6), h: R(120, 340) * (0.6 + k * 0.6), w: R(3, 9), t: 0, life: R(0.5, 1.1), c: 0 });
+          }
+        }
+        for (let i = s.pu.length - 1; i >= 0; i--) {
+          const p = s.pu[i]; p.t += dt; if (p.t > p.life) { s.pu.splice(i, 1); continue; }
+          p.y += p.vy * dt; p.x += Math.sin(p.t * 2 + p.d) * 20 * dt;
+          const u = p.t / p.life, a = Math.sin(Math.PI * u) * (0.55 + k * 0.45), r = p.r * (0.7 + u * 0.7);
+          const gr = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+          gr.addColorStop(0, `rgba(${p.c},${a})`); gr.addColorStop(0.55, `rgba(${p.c},${a * 0.55})`); gr.addColorStop(1, `rgba(${cd},0)`);
+          g.fillStyle = gr; g.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+        }
+        for (let i = s.st.length - 1; i >= 0; i--) {
+          const p = s.st[i]; p.t += dt; if (p.t > p.life) { s.st.splice(i, 1); continue; }
+          p.y += p.vy * dt; const u = p.t / p.life, a = Math.sin(Math.PI * u) * (0.8 + k * 0.4);
+          const gr = g.createLinearGradient(0, p.y, 0, p.y + p.h);
+          gr.addColorStop(0, `rgba(${ca},0)`); gr.addColorStop(0.5, `rgba(${ca},${a})`); gr.addColorStop(1, `rgba(${cb},${a * 0.3})`);
+          g.fillStyle = gr; g.fillRect(p.x - p.w / 2, p.y, p.w, p.h);
+          g.fillStyle = `rgba(255,255,255,${a * 0.7})`; g.fillRect(p.x - p.w / 6, p.y + p.h * 0.25, p.w / 3, p.h * 0.5);
+        }
+      });
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(t => { last = t; step(t); });
+    return true;
+  })();
+  function fAura(side, p, h) {
+    const f = $('#battle .fighter.' + side); if (!f || !p) return;
+    const [a, b, d] = AURA[auraKey(p, h.stance)].split('|'), k = h.maxCosmo > 0 ? Math.max(0, Math.min(1, h.cosmo / h.maxCosmo)) : 0;
+    f.style.setProperty('--ca', a); f.style.setProperty('--cb', b); f.style.setProperty('--cd', d); f.style.setProperty('--k', k.toFixed(3));
+    f.classList.toggle('c-on', k > 0.04); f.classList.toggle('c-max', k >= 0.995); f.classList.toggle('c-dark', auraKey(p, h.stance) === 'dark');
+  }
+  const stanceFx = () => {};
+  // o Mestre do Santuário aparece como "???" até assumir uma postura; aí revela quem é: Saga de Gêmeos
+  const revealed = p => p.charId === 20 && !!p.stance;
+  function hudName(p, side) {
+    const c = CH[p.charId];
+    return (revealed(p) ? 'Saga de Gêmeos' : c.name) + (side === 'me' ? '' : (S.mode === 'host' || S.mode === 'guest') ? ' (amigo)' : ' (CPU)');
+  }
   // Mestre do Santuário: primeira troca de postura (revelação)
   async function mestreReveal(pi, st) {
     const f = fighterEl(pi), img = f.querySelector('img'), key = CH[st.p[pi].charId].key, rv = $('#battle .mreveal');
@@ -355,6 +413,7 @@
     rv.classList.remove('show'); void rv.offsetWidth; rv.classList.add('show');
     await FX.reveal(chest(pi), dir(pi), () => {
       img.src = IMG['spr2_' + key]; f.classList.remove('charge'); f.classList.add('rise');
+      $('#battle .hud.' + sideOf(pi) + ' .nm').textContent = hudName({ charId: st.p[pi].charId, stance: 1 }, sideOf(pi));
       Snd.play('sfx_helmet', 1, 1.6); Snd.play('sfx_golpe_saga', .9, 2.2);
     });
     f.classList.remove('rise', 'charge'); rv.classList.remove('show');
@@ -438,7 +497,7 @@
         const first = !(S.mReveal && S.mReveal[e.p]);
         if (e.reveal || (first && e.s && store.get('debug', false) && st.p[e.p].charId === 20)) { (S.mReveal = S.mReveal || {})[e.p] = true; await mestreReveal(e.p, st); }
         else Snd.play('sfx_character_change');
-        } $('#battle .fighter.' + sideOf(e.p) + ' img').src = IMG[(e.s ? 'spr2_' : 'spr_') + CH[st.p[e.p].charId].key]; floatText(e.p, ['Postura Neutra', 'Postura Ofensiva', 'Postura Defensiva'][e.s], 'good', -30); await wait(300); return;
+        } $('#battle .fighter.' + sideOf(e.p) + ' img').src = IMG[(e.s ? 'spr2_' : 'spr_') + CH[st.p[e.p].charId].key]; stanceFx(sideOf(e.p), e.s); floatText(e.p, ['Postura Neutra', 'Postura Ofensiva', 'Postura Defensiva'][e.s], 'good', -30); await wait(300); return;
       case 'turn': {
         const mine = e.p === S.me;
         $$('#battle .fighter').forEach(f => f.classList.remove('turn')); fighterEl(e.p).classList.add('turn');
@@ -481,6 +540,7 @@
       el.querySelector('.bar .fill').style.width = pct + '%';
       el.querySelector('.bar span').textContent = Math.ceil(h.life);
       el.querySelector('.glass span').textContent = Math.floor(h.cosmo + 1e-6);
+      fAura(side, st.p[pi], h);
       el.querySelector('.plate span').textContent = ['NEUTRA', 'OFENSIVA', 'DEFENSIVA'][h.stance];
       const pd = $('#battle .pd.' + side);
       pd.querySelector('.att').textContent = Math.round(h.att); pd.querySelector('.def').textContent = Math.round(h.def);
@@ -493,12 +553,12 @@
     const P = v.p[S.me], O = v.p[1 - S.me];
     ['me', 'op'].forEach(side => {
       const p = side === 'me' ? P : O, c = CH[p.charId], g = grp(p.charId), el = $('#battle .hud.' + side);
-      $('#battle .fighter.' + side + ' img').src = IMG[(p.stance ? 'spr2_' : 'spr_') + c.key];
+      $('#battle .fighter.' + side + ' img').src = IMG[(p.stance ? 'spr2_' : 'spr_') + c.key]; stanceFx(side, p.stance);
       el.querySelector('.frame').src = IMG['hp_' + g];
       el.querySelector('.glass img').src = IMG['vidro_' + g];
       el.querySelector('.plate img').src = IMG['sel_' + g];
       el.querySelector('.bar .fill').style.backgroundImage = url('hp_bar');
-      el.querySelector('.nm').textContent = c.name + (side === 'me' ? '' : (S.mode === 'host' || S.mode === 'guest') ? ' (amigo)' : ' (CPU)');
+      el.querySelector('.nm').textContent = hudName(p, side);
       const good = p.debuffs.filter(d => !d.negativeDebuff).length, bad = p.debuffs.filter(d => d.negativeDebuff).length;
       el.querySelector('.effs').innerHTML = (good ? `<div class="eff" data-side="${side}" style='background-image:${url('ic_buff')}'><b>${good}</b></div>` : '') +
         (bad ? `<div class="eff" data-side="${side}" style='background-image:${url('ic_debuff')}'><b>${bad}</b></div>` : '');
@@ -611,7 +671,7 @@
   function openInfo(side) {
     const v = S.view; if (!v) return;
     const p = v.p[side === 'me' ? S.me : 1 - S.me], c = CH[p.charId];
-    $('#mInfo .ttl').textContent = c.title;
+    $('#mInfo .ttl').textContent = revealed(p) ? 'Saga de Gêmeos' : c.title;
     let html = `<div class="it good"><b>${esc(c.passive.split('\n')[0])}</b><div>${esc(c.passive.split('\n').slice(1).join('\n'))}</div></div>`;
     html += `<div class="it"><b>Especial: ${esc(c.special.tittle)}</b><div>${esc(c.special.description)} (custo ${Math.abs(c.special.statsRequired.cosmo)})</div></div>`;
     if (!p.debuffs.length) html += '<div class="it"><div>Nenhum efeito ativo.</div></div>';
