@@ -497,3 +497,13 @@ button{font-family:inherit}
 .trapi small{display:block;font-size:9px;letter-spacing:1.5px;color:#d9b6ff;margin-bottom:3px}
 .trapi.me{right:calc(100% + 16px)}
 .trapi.op{left:calc(100% + 16px)}
+
+/* reações: sem layout por frame, feedback em camada própria */
+#react{transition:none!important;background:rgba(0,0,0,.12)}
+#rfb{position:absolute;inset:0;z-index:31;pointer-events:none}
+.rfl{position:absolute;inset:0;opacity:0;animation:rfl .5s ease-out forwards}
+.rfl.perfect{background:rgba(70,255,150,.30)}.rfl.good{background:rgba(255,220,80,.26)}.rfl.miss{background:rgba(255,60,50,.32)}
+@keyframes rfl{0%{opacity:1}100%{opacity:0}}
+.rg-ring.mv{border-width:14px;will-change:transform;box-shadow:0 0 16px #ffcf40}
+.rg-ring,.rg-arrow,.rg-weak,.rg-res{will-change:transform,opacity}
+.rg-ring.res-perfect,.rg-ring.res-good,.rg-ring.res-miss,.rg-arrow.res-perfect,.rg-arrow.res-good,.rg-arrow.res-miss{box-shadow:none!important}

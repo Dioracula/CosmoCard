@@ -490,10 +490,18 @@
       S.busyR = true; renderControls();
       try {
         const d = 1 - pi;
+        const cpuM = S.mode === 'cpu' || S.mode === 'sant' || S.mode === 'torre' || S.mode === 'weekly', lv = S.mode === 'torre' && S.run ? Math.min(.2, S.run.floor * .01) : 0;
         if (pi === S.me && a.prec == null && rOn('prec')) a.prec = await mgPrec(d);
-        a.guard = 0;
-        if (d === S.me) { if (rOn('guard')) a.guard = await mgGuard(d); }
-        else if (S.mode === 'host' && S.link) a.guard = await askRemote();
+        else if (cpuM && pi === 1 && a.prec == null) a.prec = rOn('prec') && Math.random() < .3 + lv ? 1 : 0;   // NPC também acerta o ponto fraco
+        a.guard = 0; a.guard2 = 0;
+        const hc = G.p[pi].hand.find(x => x.uid === a.uid), nh = hc && a.type === 'play' && E.cardOf(G.p[pi], hc.ref).hits > 1 ? 2 : 1;   // Golpe Duplo: a guarda é testada duas vezes
+        for (let k = 0; k < nh; k++) {
+          let g = 0;
+          if (cpuM && d === 1) { if (rOn('guard')) { const r = Math.random(), pp = .1 + lv; g = r < pp ? (Math.random() < .4 ? 3 : 2) : r < pp + .3 ? 1 : 0; } }   // NPC também defende
+          else if (d === S.me) { if (rOn('guard')) g = await mgGuard(d, G.p[d].debuffs.some(x => x.easyGuard)); }
+          else if (S.mode === 'host' && S.link) g = await askRemote();
+          if (k === 0) a.guard = g; else a.guard2 = g;
+        }
       } catch (e) { console.error(e); }
       S.busyR = false;
     }
@@ -501,21 +509,23 @@
   }
   function mgRun(build) {
     return new Promise(res => {
-      const el = $('#react'); el.innerHTML = ''; el.classList.add('on'); let fin = false, tm;
+      const el = $('#react'); el.innerHTML = ''; el.style.pointerEvents = ''; el.dataset.tok = String((+el.dataset.tok || 0) + 1); el.classList.add('on'); let fin = false, tm;
       const fw = ev => { if (!el.classList.contains('on')) return; if (el.contains(ev.target)) return; const h = el['on' + ev.type]; if (h) { ev.preventDefault(); h(ev); } };
       const evs = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'];
       evs.forEach(n => window.addEventListener(n, fw, true)); document.body.style.touchAction = 'none';
       const unbind = () => { evs.forEach(n => window.removeEventListener(n, fw, true)); document.body.style.touchAction = ''; };
       const done = (v, txt, ok, sub) => { if (fin) return; fin = true; clearTimeout(tm);
-        el.onpointerdown = el.onpointerup = el.onpointermove = el.onpointercancel = null; unbind();
+        el.onpointerdown = el.onpointerup = el.onpointermove = el.onpointercancel = null; unbind(); el.style.pointerEvents = 'none';
         const lvl = ok ? (v >= 2 ? 'perfect' : 'good') : 'miss';
         el.querySelectorAll('.rg-ring:not(.tgt),.rg-arrow,.rg-weak').forEach(n => n.classList.add('res-' + lvl));
         el.querySelectorAll('.rg-lbl').forEach(n => n.remove());
-        el.classList.remove('f-perfect', 'f-good', 'f-miss'); void el.offsetWidth; el.classList.add('f-' + lvl);
-        if (txt) { const t = mk('rg-res ' + lvl, el.dataset.x, el.dataset.y - 130, txt); if (sub) { const s = document.createElement('small'); s.textContent = sub; t.appendChild(s); } el.appendChild(t); }
+        const fb = $('#rfb'), fl = document.createElement('div'); fl.className = 'rfl ' + lvl; fb.appendChild(fl); setTimeout(() => fl.remove(), 520);
+        if (txt) { const t = mk('rg-res ' + lvl, el.dataset.x, el.dataset.y - 130, txt); if (sub) { const s = document.createElement('small'); s.textContent = sub; t.appendChild(s); } fb.appendChild(t); setTimeout(() => t.remove(), 900); }
         Snd.play(lvl === 'perfect' ? 'sfx_gain_power' : lvl === 'good' ? 'sfx_card_flip' : 'sfx_lose_power', .8);
         if (lvl === 'perfect') FX.shake(6, .25);
-        setTimeout(() => { el.classList.remove('on', 'f-perfect', 'f-good', 'f-miss'); el.innerHTML = ''; res(v); }, txt ? 750 : 40); };
+        const tok = el.dataset.tok;
+        setTimeout(() => { if (el.dataset.tok === tok) { el.classList.remove('on'); el.style.pointerEvents = ''; el.innerHTML = ''; } }, 450);
+        setTimeout(() => res(v), txt ? 170 : 20); };
       build(el, done, t => { tm = setTimeout(() => done(0, 'MUITO LENTO', false), t); });
     });
   }
@@ -523,17 +533,18 @@
   function ripple(el, e, lvl) { const s = stage.getBoundingClientRect(), r = document.createElement('div'); r.className = 'rg-rip ' + lvl; r.style.left = (rot ? (e.clientY - s.top) / scale : (e.clientX - s.left) / scale) + 'px'; r.style.top = (rot ? (s.right - e.clientX) / scale : (e.clientY - s.top) / scale) + 'px'; el.appendChild(r); }
   const toGame = (dx, dy) => rot ? [dy, -dx] : [dx, dy];
   function mgTap(pi) {   // anel que encolhe: toque quando fechar no alvo
-    const [x, y] = chest(pi), T = 950;
+    const [x, y] = chest(pi), EZ = S.easy, T = EZ ? 1200 : 950, TW = EZ ? 190 : 120, GW = EZ ? 400 : 280;
     return mgRun((el, done, arm) => {
       el.dataset.x = x; el.dataset.y = y;
       el.appendChild(mk('rg-lbl', x, y - 190, 'DEFENDA! Toque quando o anel fechar'));
-      const tgt = mk('rg-ring tgt', x, y); tgt.style.width = tgt.style.height = '110px'; el.appendChild(tgt);
-      const ring = mk('rg-ring', x, y); ring.style.width = ring.style.height = '420px'; el.appendChild(ring);
-      requestAnimationFrame(() => requestAnimationFrame(() => { ring.style.transition = `width ${T}ms linear,height ${T}ms linear`; ring.style.width = ring.style.height = '110px'; }));
-      Snd.play('sfx_card_zoom', .6); const t0 = performance.now();
+      const tgt = mk('rg-ring tgt', x, y); tgt.style.width = tgt.style.height = (EZ ? '150px' : '110px'); el.appendChild(tgt);
+      const ring = mk('rg-ring mv', x, y); ring.style.width = ring.style.height = '420px'; el.appendChild(ring);
+      let t0 = performance.now() + 40;
+      requestAnimationFrame(() => requestAnimationFrame(() => { t0 = performance.now(); ring.style.transition = `transform ${T}ms linear`; ring.style.transform = 'translate(-50%,-50%) scale(' + (EZ ? .357 : .262) + ')'; }));
+      Snd.play('sfx_card_zoom', .6);
       el.onpointerdown = ev => { const sg = performance.now() - t0 - T, e = Math.abs(sg), ms = Math.round(sg) + ' ms';
-        ripple(el, ev, e <= 120 ? 'perfect' : e <= 280 ? 'good' : 'miss');
-        if (e <= 120) done(2, 'PERFEITO!', true, ms); else if (e <= 280) done(1, 'BOM!', true, sg < 0 ? 'um pouco cedo' : 'um pouco tarde'); else done(0, 'ERROU!', false, sg < 0 ? 'cedo demais' : 'tarde demais'); };
+        ripple(el, ev, e <= TW ? 'perfect' : e <= GW ? 'good' : 'miss');
+        if (e <= TW) done(2, 'PERFEITO!', true, ms); else if (e <= GW) done(1, 'BOM!', true, sg < 0 ? 'um pouco cedo' : 'um pouco tarde'); else done(0, 'ERROU!', false, sg < 0 ? 'cedo demais' : 'tarde demais'); };
       arm(T + 320);
     });
   }
@@ -553,9 +564,10 @@
       arm(T);
     });
   }
-  async function mgGuard(pi) {
+  async function mgGuard(pi, easy) {
+    S.easy = !!easy;
     const swipe = Math.random() < 0.4; let q;
-    if (swipe) { const want = ['up', 'left', 'right'][Math.floor(Math.random() * 3)]; q = await mgSwipe(pi, want, 900, 'APARE! Deslize na direção da seta'); }
+    if (swipe) { const want = ['up', 'left', 'right'][Math.floor(Math.random() * 3)]; q = await mgSwipe(pi, want, S.easy ? 1300 : 900, 'APARE! Deslize na direção da seta'); }
     else q = await mgTap(pi);
     if (q === 2) { const c = await mgSwipe(pi, 'up', 800, 'CONTRA-GOLPE! Deslize para cima'); if (c === 2 || c === 1) q = 3; }
     return q;
@@ -1052,7 +1064,7 @@
     zd.textContent = '♻ Descartar (+' + E.DISCARD_COSMO + ')';
     zt.disabled = !(myFree() && !P.trap && P.stats.cosmo >= E.trapCost(P, card));
     zd.disabled = !(myFree() && !P.discarded);
-    if (norm) $('#mZoom .kv').innerHTML += `<span>${tOk ? '🪤 Armadilha (custa o dobro): ativa o efeito desta carta ANTES do próximo ataque do inimigo · ' : ''}♻ Descartar: ganha ${E.DISCARD_COSMO} de cosmo (1x por turno)</span>`;
+    if (norm) $('#mZoom .kv').innerHTML += `<span>${tOk ? '🪤 Armadilha (custa +15): ativa o efeito desta carta ANTES do próximo ataque do inimigo · ' : ''}♻ Descartar: ganha ${E.DISCARD_COSMO} de cosmo (1x por turno)</span>`;
     
     modal('mZoom');
   }
@@ -1239,7 +1251,7 @@
       deliver(m.ev, m.st);
     }
     else if (m.k === 'act' && S.mode === 'host' && S.G) { applyR(1, m.a); }
-    else if (m.k === 'ask' && S.mode === 'guest') { (async () => { let q = 0; if (rOn('guard')) { S.busyR = true; try { q = await mgGuard(S.me); } catch (e) {} S.busyR = false; } S.link.send({ k: 'ares', q }); })(); }
+    else if (m.k === 'ask' && S.mode === 'guest') { (async () => { let q = 0; if (rOn('guard')) { S.busyR = true; try { q = await mgGuard(S.me, !!(S.view && S.view.p[S.me].debuffs.some(x => x.easyGuard))); } catch (e) {} S.busyR = false; } S.link.send({ k: 'ares', q }); })(); }
     else if (m.k === 'ares' && S.mode === 'host' && S.askRes) { S.askRes(m.q | 0); }
     else if (m.k === 'again') {
       S.friendIn = true;

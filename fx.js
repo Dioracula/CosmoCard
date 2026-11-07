@@ -411,6 +411,8 @@ window.FX = (function () {
     '30_ataque_defensivo': ['orb', '#7fb2ff'], '36_ataques_continuos': ['multi', '#ffd080'], '37_ataques_opressivos': ['orb', '#c080ff'],
     '14_golpe_agonizante': ['orb', '#9a55ff'], '15_sangramento': ['slash', '#ff2a2a'], '20_ataque_perfurante': ['pierce', '#fff2a0'],
     '21_destruicao_de_sentidos': ['zap', '#a9b8ff'],
+    '40_golpe_duplo': ['multi', '#ffd080'], '41_investida': ['streak', '#ff8a5a'], '42_quebra_guarda': ['pierce', '#ffe08a'],
+    '43_golpe_oportuno': ['slash', '#ffb070'], '44_ataque_sacrificio': ['orb', '#ff3030'], '45_rajada_de_cosmo': ['multi', '#7fe4ff'],
   };
   const C_DEF = {
     '05_contra_ataque': ['shield', '#ffb060'], '06_esquiva': ['wind', '#bff6ff'], '07_defesa_perfeita': ['barrier', '#8fe9ff'],
@@ -421,6 +423,9 @@ window.FX = (function () {
     '26_velocidade_da_luz': ['light', '#fff6c0'], '27_tenacidade': ['aura', '#ffb040'], '28_sentidos_ampliados': ['circle', '#bff6ff'],
     '31_setimo_sentido': ['seventh', '#ffe08a'], '34_pureza_de_espirito': ['heal', '#ffffff'], '35_desespero': ['dark', '#6a2cff'],
     '38_afinidade_com_o_signo': ['circle', '#ffb0e0'], '18_interferencia_cosmica': ['zapT', '#c080ff'],
+    '46_postura_de_combate': ['aura', '#ffe08a'], '47_espelho_de_cosmo': ['circle', '#bff6ff'], '48_armadura_reforcada': ['shield', '#9fb8ff'],
+    '49_respiracao_do_cosmo': ['aura', '#7fe4ff'], '50_provocacao': ['curse', '#ff6a5a'], '51_pausa_tatica': ['wind', '#ffffff'],
+    '52_troca_de_destino': ['circle', '#c080ff'], '54_reflexos_agucados': ['aura', '#bff6ff'], '55_mira_agucada': ['aura', '#ffe08a'], '53_vinculo_de_cosmo': ['heal', '#8dffb0'],
   };
   async function card(sprite, A, B, d) {
     const att = C_ATT[sprite];
