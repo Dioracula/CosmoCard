@@ -33,6 +33,29 @@
     13: [340, 30, 24], 12: [340, 28, 24], 6: [450, 22, 32], 15: [320, 25, 22], 7: [330, 24, 24], 18: [350, 26, 26], 20: [400, 30, 28],
   };
   D.chars.forEach(c => { const s = CHAR_STATS[c.id]; if (s) { c.stats.maxLife = c.stats.life = s[0]; c.stats.attPower = s[1]; c.stats.defPower = s[2]; } });
+  // traço único de cada cavaleiro (segunda característica, além da passiva), inspirado na história do personagem
+  const UNIQ = {
+    0: ['Milagre de Pégaso', 'Uma vez por batalha, ao cair para 30% da vida ou menos: recupera 50 de Vida e +30 de Cosmo.'],
+    21: ['Cometa Ascendente', 'A cada 3º ataque direto que acerta, o golpe explode e causa +12 de Dano extra.'],
+    18: ['Armadura de Ouro', 'Entra na batalha com +8 de Defesa.'],
+    1: ['Dragão Ascendente', 'Uma vez por batalha, ao cair para 50% da vida ou menos: Força +10 (Permanente).'],
+    2: ['Coração Puro', 'Cada carta de defesa usada recupera 4 de Vida.'],
+    3: ['Pó de Diamante', 'Ataques diretos congelam o cosmo do Oponente: -8 de Cosmo.'],
+    4: ['Fênix Renascida', 'Uma vez por batalha, ao receber um golpe fatal: sobrevive e renasce com 25% da Vida.'],
+    5: ['Muralha de Cristal', 'Cartas de defesa custam 5 de Cosmo a menos.'],
+    6: ['Muralha Taurina', 'Nenhum golpe tira mais de 25% da Vida máxima de Aldebaran.'],
+    16: ['Dupla Personalidade', 'A cada turno alterna: Lado da Luz (+6 Defesa) e Lado Sombrio (+6 Força).'],
+    7: ['Ondas do Inferno', 'Ataques diretos sugam a alma do Oponente: recupera 15% do Dano causado.'],
+    11: ['Meditação (Om)', 'Se terminar o turno sem atacar, recupera +20 de Cosmo.'],
+    12: ['Honra Escarlate', 'Ataques diretos causam +12 de Dano em Oponentes abaixo de 30% da Vida.'],
+    9: ['Coração Ardente', 'A Fúria carrega 50% mais rápido.'],
+    13: ['Lâmina Sagrada', '+15% de chance de Crítico nos ataques diretos.'],
+    8: ['Zero Absoluto', 'Cada ataque direto drena 3 de Força do Oponente (até -15 no total).'],
+    15: ['Rosa Sangrenta', 'Ataques diretos envenenam o Oponente: 4 de Dano no início dos 2 turnos seguintes.'],
+    20: ['Genrō Maō Ken', 'No início de cada turno do Mestre, 30% de chance de dominar a mente do Oponente: -15 de Cosmo e saca 1 carta a menos no próximo turno.'],
+    19: ['Guardião de Atena', 'Uma vez por batalha, ao cair para 40% da vida ou menos: Defesa +15 (Permanente).'],
+  };
+  D.chars.forEach(c => { const u = UNIQ[c.id]; if (u) { c.unique = u[0]; c.uniqueDesc = u[1]; } });
   // pequenos ajustes onde o dado original contradiz o texto da carta
   D.chars.forEach(c => {
     const s = c.special;
@@ -55,10 +78,11 @@
   let UID = 1;
   function newPlayer(charId, idx) {
     const c = charById[charId];
+    const stats = clone(c.stats); if (charId === ID.SEIYASAG) stats.defPower += 8;
     return {
-      idx, charId, stats: clone(c.stats), stance: 0, stanceChanged: false, hand: [], debuffs: [], invalid: [],
+      idx, charId, stats, stance: 0, stanceChanged: false, hand: [], debuffs: [], invalid: [],
       specialProb: c.specialProb, specialInterval: SPECIAL_INTERVAL, specialCounter: SPECIAL_INTERVAL,
-      camusApplied: false, cosmoMult: 1,
+      camusApplied: false, cosmoMult: 1, uq: {}, poison: null,
     };
   }
 
@@ -92,7 +116,7 @@
     if ((has(0) || has(21)) && has(1) && has(3)) out.push({ name: 'Os Três Heróis', desc: 'Seiya, Shiryu e Hyoga: +3 Força, +3 Defesa e +10 Vida', b: { att: 3, def: 3, life: 10 } });
     return out;
   }
-  const REC = ['charId', 'stats', 'stance', 'stanceChanged', 'debuffs', 'invalid', 'specialProb', 'specialInterval', 'specialCounter', 'camusApplied', 'cosmoMult'];
+  const REC = ['uq', 'poison', 'charId', 'stats', 'stance', 'stanceChanged', 'debuffs', 'invalid', 'specialProb', 'specialInterval', 'specialCounter', 'camusApplied', 'cosmoMult'];
   function takeRec(p) { const r = {}; REC.forEach(k => { r[k] = p[k]; }); return r; }
   function putRec(p, r) { REC.forEach(k => { p[k] = r[k]; }); }
   function buildTeam(G, p, ids, syn) {
@@ -183,13 +207,14 @@
     if (tauntBlock(G, p, card)) return false;
     const req = card.statsRequired;
     if (Math.round(p.stats.cosmo) < costOf(p, card)) return false;
-    if (p.stats.attPower < req.attPower) return false;
-    if (p.stats.defPower < req.defPower) return false;
+    if (Math.max(0, p.stats.attPower) < req.attPower) return false;
+    if (Math.max(0, p.stats.defPower) < req.defPower) return false;
     return true;
   }
   function costOf(p, card) {
     const mult = hasDebuff(p, d => d.isCosmicInterference) ? 2 : 1;
     let c = Math.abs(card.statsRequired.cosmo) * mult;
+    if (p.charId === ID.MU && !card.special && !card.offensive) c = Math.max(0, c - 5);
     if (card.special) c = Math.max(0, c - (p.specialDisc || 0) - (hasRelic(p, 'eterno') ? 20 : 0));
     return c;
   }
@@ -216,7 +241,7 @@
     return c.reduce((b, h) => sc(h) > sc(b) ? h : b, c[0]);
   }
   const tauntBlock = (G, p, card) => p.debuffs.some(d => d.isTaunt) && !card.offensive &&
-    p.hand.some(h => { const c = cardOf(p, h.ref); return c.offensive && Math.round(p.stats.cosmo) >= costOf(p, c) && p.stats.attPower >= c.statsRequired.attPower; });
+    p.hand.some(h => { const c = cardOf(p, h.ref); return c.offensive && Math.round(p.stats.cosmo) >= costOf(p, c) && Math.max(0, p.stats.attPower) >= c.statsRequired.attPower; });
 
   // estimativa de dano mostrada na carta
   function estimate(G, p, card) {
@@ -322,7 +347,8 @@
   }
   function clearReact(G, pi) {
     const p = G.p[pi], t = G.p[1 - pi];
-    if ((t.guardQ === 3 || t.guardQ1 === 3) && !G.over && p.stats.life > 0) {
+    // contra-golpe: só se o atacante NÃO estiver defensivo e a Defesa de quem defendeu for maior que a do atacante
+    if ((t.guardQ === 3 || t.guardQ1 === 3) && !G.over && p.stats.life > 0 && p.stance !== 2 && cur(t).defPower > cur(p).defPower) {
       emit(G, { t: 'text', p: t.idx, txt: 'CONTRA-GOLPE!', kind: 'good', combo: true });
       // contra-golpe: dano fixo (sem Força/Defesa), proporcional ao que foi bloqueado, no máximo 12
       updateStats(G, p, { life: -Math.max(2, Math.min(8, Math.round((G.reactPrev || 0) * 0.2))) }, true);
@@ -340,8 +366,9 @@
     if (G.wx === 'vento' && d > 0) d += 4;
     if (target.charId === ID.SHIRYU && d <= 10) { if (d > 0) emit(G, { t: 'text', p: target.idx, txt: 'ESCUDO DO DRAGÃO', kind: 'block' }); d = 0; }
     if (target.charId === ID.MESTRE && d > 0) { d = Math.max(0, d - 8); emit(G, { t: 'passive', p: target.idx }); }
+    if (attacker.charId === ID.MIRO && attacker !== target && d > 0 && target.stats.life < target.stats.maxLife * 0.3) { d += 12; emit(G, { t: 'text', p: attacker.idx, txt: 'HONRA ESCARLATE', kind: 'good' }); }
     if (d > 0) {
-      const cc = (G.mod === 'critico' ? 0.2 : 0) + (attacker.crit || 0);
+      const cc = (G.mod === 'critico' ? 0.2 : 0) + (attacker.crit || 0) + (attacker.charId === ID.SHURA && attacker !== target ? 0.15 : 0);
       if (cc > 0 && Math.random() < cc) { d = Math.round(d * 1.5); emit(G, { t: 'text', p: target.idx, txt: 'CRÍTICO!', kind: 'good', crit: true }); }
     }
     if (d > 0 && attacker !== target && attacker.precQ) {
@@ -354,6 +381,9 @@
         if (gq >= 2 && !G.norage) target.rage = Math.min(100, (target.rage || 0) + 6); }
     }
     if (d > 0 && hasRelic(target, 'ferro')) d = Math.max(0, d - 3);
+    if (d > 0 && target.charId === ID.ALDEBARAN && attacker !== target) { const cap = Math.round(target.stats.maxLife * 0.25); if (d > cap) { d = cap; emit(G, { t: 'text', p: target.idx, txt: 'MURALHA TAURINA', kind: 'block' }); } }
+    let rebirth = false;
+    if (d > 0 && target.charId === ID.IKKI && !target.uq.reborn && target.stats.life - d <= 0) { d = Math.max(0, target.stats.life - 1); target.uq.reborn = true; rebirth = true; }
     if (d > 0 && hasRelic(target, 'ultima') && !target.ultimaUsed && target.stats.life - d <= 0) { d = Math.max(0, target.stats.life - 1); target.ultimaUsed = true; emit(G, { t: 'text', p: target.idx, txt: 'ÚLTIMA CHANCE!', kind: 'good' }); }
     if (d > 0 && target.senseOn && !target.araUsed && target.stats.life - d <= 0) { d = Math.max(0, target.stats.life - 1); araSave(G, target, true); }
     if (d > 0) {
@@ -362,6 +392,7 @@
       for (const db of target.debuffs) if (db.isDamageConversion) db.conversionDamageTotal = (db.conversionDamageTotal || 0) + d;
       target.stats.life = clamp(target.stats.life - d, 0, target.stats.maxLife);
       emit(G, { t: 'dmg', p: target.idx, v: d });
+      if (rebirth) { emit(G, { t: 'text', p: target.idx, txt: 'A FÊNIX RENASCE!', kind: 'good' }); updateStats(G, target, { life: Math.round(target.stats.maxLife * 0.25) }, true); }
     } else {
       emit(G, { t: 'dmg', p: target.idx, v: 0 });
     }
@@ -371,24 +402,26 @@
     target.stats.defPower = Math.max(0, target.stats.defPower + side.defPower);
     statText(G, target, side);
     if (d > 0 && !G.over && !G.norage) {
-      target.rage = Math.min(100, (target.rage || 0) + d * RAGE_RATE * (hasRelic(target, 'chama') ? 2 : 1));
-      if (attacker !== target) attacker.rage = Math.min(100, (attacker.rage || 0) + d * 0.3 * RAGE_RATE * (hasRelic(attacker, 'chama') ? 2 : 1));
+      target.rage = Math.min(100, (target.rage || 0) + d * RAGE_RATE * (hasRelic(target, 'chama') ? 2 : 1) * (target.charId === ID.AIORIA ? 1.5 : 1));
+      if (attacker !== target) attacker.rage = Math.min(100, (attacker.rage || 0) + d * 0.3 * RAGE_RATE * (hasRelic(attacker, 'chama') ? 2 : 1) * (attacker.charId === ID.AIORIA ? 1.5 : 1));
     }
     if (d > 0 && attacker !== target && hasRelic(target, 'espinhos')) updateStats(G, attacker, { life: -Math.max(1, Math.round(d * 0.25)) }, true);
     if (d > 0 && attacker.vamp) updateStats(G, attacker, { life: Math.max(1, Math.round(d * attacker.vamp)) }, true);
-    if (d > 0) { if (attacker !== target) sigAdd(target, 'hit', 1); tookDamage(G, target, attacker); doneDamage(G, attacker, target); }
+    if (d > 0) { if (attacker !== target) sigAdd(target, 'hit', 1); tookDamage(G, target, attacker, d); doneDamage(G, attacker, target, d); }
     return d > 0;
   }
 
   // PassiveAbilitiesManager
-  function tookDamage(G, p, attacker) {
+  function tookDamage(G, p, attacker, d) {
+    uniqTook(G, p, attacker);
     if (p.charId === ID.SEIYA || p.charId === ID.SEIYACAP) { updateStats(G, p, { attPower: 2 }, true); emit(G, { t: 'passive', p: p.idx }); }
     if (p.charId === ID.AFRODITE && attacker.stats.life > 0) {
       emit(G, { t: 'passive', p: p.idx });
       updateStats(G, attacker, { life: -5 }, true);
     }
   }
-  function doneDamage(G, p, target) {
+  function doneDamage(G, p, target, d) {
+    uniqDone(G, p, target, d);
     if (p.charId === ID.DEATHMASK) { updateStats(G, p, { attPower: 2 }, true); emit(G, { t: 'passive', p: p.idx }); }
     if (p.charId === ID.CAMUS && !p.camusApplied && target.senseOn) { p.camusApplied = true; emit(G, { t: 'text', p: target.idx, txt: 'IMUNE às leis de Hades', kind: 'block' }); }
     if (p.charId === ID.CAMUS && !p.camusApplied) {
@@ -397,6 +430,24 @@
         turnDuration: 1, drawCardBuff: -1, debuffDescription: 'Saca uma carta a menos no próximo turno.' }));
       emit(G, { t: 'passive', p: p.idx });
     }
+  }
+
+  // traços únicos
+  function uniqTook(G, p, attacker) {
+    if (attacker === p || G.over || p.stats.life <= 0) return;
+    const r = p.stats.life / p.stats.maxLife, u = p.uq;
+    if (p.charId === ID.SEIYA && !u.miracle && r <= 0.3) { u.miracle = 1; emit(G, { t: 'text', p: p.idx, txt: 'MILAGRE DE PÉGASO!', kind: 'good' }); updateStats(G, p, { life: 50, cosmo: 30 }, true); }
+    if (p.charId === ID.SHIRYU && !u.dragon && r <= 0.5) { u.dragon = 1; emit(G, { t: 'text', p: p.idx, txt: 'DRAGÃO ASCENDENTE!', kind: 'good' }); updateStats(G, p, { attPower: 10 }, true); }
+    if (p.charId === ID.AIOROS && !u.guard && r <= 0.4) { u.guard = 1; emit(G, { t: 'text', p: p.idx, txt: 'GUARDIÃO DE ATENA!', kind: 'good' }); updateStats(G, p, { defPower: 15 }, true); }
+  }
+  function uniqDone(G, p, target, d) {
+    if (p === target || G.over || !(d > 0)) return;
+    const u = p.uq;
+    if (p.charId === ID.SEIYACAP) { u.hits = (u.hits || 0) + 1; if (u.hits % 3 === 0 && target.stats.life > 0) { emit(G, { t: 'text', p: p.idx, txt: 'COMETA ASCENDENTE!', kind: 'good', combo: true }); updateStats(G, target, { life: -12 }, true); checkOver(G); } }
+    if (p.charId === ID.HYOGA && target.stats.cosmo > 0) { emit(G, { t: 'text', p: p.idx, txt: 'PÓ DE DIAMANTE', kind: 'good' }); updateStats(G, target, { cosmo: -8 }, true); }
+    if (p.charId === ID.DEATHMASK) updateStats(G, p, { life: Math.max(1, Math.round(d * 0.15)) }, true);
+    if (p.charId === ID.CAMUS && (u.drain || 0) < 15 && !target.senseOn) { u.drain = (u.drain || 0) + 3; updateStats(G, target, { attPower: -3 }, true); }
+    if (p.charId === ID.AFRODITE && !target.senseOn) { target.poison = { t: 2, v: 4 }; emit(G, { t: 'text', p: target.idx, txt: 'ROSA SANGRENTA: envenenado', kind: 'fail' }); }
   }
 
   function mkDebuff(o) {
@@ -532,6 +583,7 @@
     else defensive(G, p, t, card);
     if (!card.offensive && !card.special && !['CosmoMirror', 'FateSwap', 'TacticalPause', 'StanceShift', 'CosmoBond', 'Taunt', 'SeventhSense', 'LightSpeed'].includes(card.cardAction) &&
         ((card.hasDebuffEffect && card.selfDebuff) || card.statsEffect.life || card.statsEffect.cosmo || card.statsEffect.attPower || card.statsEffect.defPower)) p.lastBuff = clone(card);
+    if (p.charId === ID.SHUN && !card.offensive && !card.special && !G.over) updateStats(G, p, { life: 4 }, true);
     p.comboBonus = 0; G.p[0].purify = G.p[1].purify = false;
     if (!card.offensive && hasRelic(p, 'egide') && !G.over) updateStats(G, p, { life: 12 }, true);
     checkOver(G);
@@ -747,7 +799,7 @@
     p.defPrev = !!p.defNow; p.defNow = false;
     turnDebuffs(G, p, false); if (G.over) return true;
     if (p.senseOn && p.sense <= 0) { p.senseOn = false; updateStats(G, p, { attPower: -SENSE_BONUS, defPower: -SENSE_BONUS }, false); emit(G, { t: 'text', p: p.idx, txt: '8º Sentido acabou', kind: 'fail' }); }
-    if (p.charId === ID.SHAKA) { if (removeOneNegative(G, p)) emit(G, { t: 'passive', p: p.idx }); }
+    if (p.charId === ID.SHAKA) { if (removeOneNegative(G, p)) emit(G, { t: 'passive', p: p.idx }); if (!p.atkCount) { emit(G, { t: 'text', p: p.idx, txt: 'MEDITAÇÃO (OM)', kind: 'good' }); updateStats(G, p, { cosmo: 20 }, true); } }
     const extra = p.debuffs.some(d => d.isGetExtraTurn);
     if (!extra) G.turn = 1 - G.turn; else emit(G, { t: 'text', p: p.idx, txt: 'TURNO EXTRA!', kind: 'good', sfx: 'sfx_velocidade_da_luz2' });
     const n = G.p[G.turn];
@@ -768,6 +820,26 @@
       }
     }
     turnDebuffs(G, n, true); if (G.over) return true;
+    if (n.charId === ID.SAGA) {   // Dupla Personalidade
+      const m = n.uq.mode || 0;
+      if (m === 1) updateStats(G, n, { attPower: -6 }, false); if (m === 2) updateStats(G, n, { defPower: -6 }, false);
+      n.uq.mode = m === 1 ? 2 : 1;
+      emit(G, { t: 'text', p: n.idx, txt: n.uq.mode === 1 ? 'LADO SOMBRIO: +6 Força' : 'LADO DA LUZ: +6 Defesa', kind: n.uq.mode === 1 ? 'fail' : 'good' });
+      updateStats(G, n, n.uq.mode === 1 ? { attPower: 6 } : { defPower: 6 }, false);
+    }
+    if (n.charId === ID.MESTRE && Math.random() < 0.3) {   // Genrō Maō Ken
+      const o = G.p[1 - n.idx];
+      if (!o.senseOn && o.stats.life > 0) {
+        emit(G, { t: 'text', p: n.idx, txt: 'GENRŌ MAŌ KEN!', kind: 'counter' });
+        updateStats(G, o, { cosmo: -15 }, true);
+        o.debuffs.push(mkDebuff({ debuffName: 'Mente Dominada', negativeDebuff: 1, isPassivePersistentDebuff: 1, turnDuration: 2, drawCardBuff: -1, debuffDescription: 'Saca uma carta a menos no próximo turno.' }));
+        emit(G, { t: 'debuff', p: o.idx, name: 'Mente Dominada', good: false });
+      }
+    }
+    if (n.poison && n.poison.t > 0) {
+      n.poison.t--; emit(G, { t: 'text', p: n.idx, txt: 'Veneno da Rosa!', kind: 'fail' }); updateStats(G, n, { life: -n.poison.v }, true);
+      if (n.poison.t <= 0) n.poison = null; checkOver(G); if (G.over) return true;
+    }
     mestreAuto(G, n);
     if (n.charId === ID.IKKI && n.stats.life < n.stats.maxLife) { emit(G, { t: 'passive', p: n.idx }); updateStats(G, n, { life: 10 }, true); }
     if (G.wx === 'estrelas') { updateStats(G, n, { cosmo: 8 }, false); emit(G, { t: 'cosmo', p: n.idx, v: 8 }); }
@@ -943,6 +1015,6 @@
     }
   }
 
-  window.Engine = { signature, sigInfo, sigReady, setReact, clearReact, trapOk, trapCost, swapCost, synergies, swapTo, setTrap, discardCard, SWAP_COST, TRAP_COST, DISCARD_COSMO, newGame, playCard, setStance, endTurn, ultimate, seventhSense, aiStep, isUsable, costOf, estimate, cardOf, cardDesc, cur,
+  window.Engine = { dealDamage, signature, sigInfo, sigReady, setReact, clearReact, trapOk, trapCost, swapCost, synergies, swapTo, setTrap, discardCard, SWAP_COST, TRAP_COST, DISCARD_COSMO, newGame, playCard, setStance, endTurn, ultimate, seventhSense, aiStep, isUsable, costOf, estimate, cardOf, cardDesc, cur,
     charById, ID, MAX_HAND, D };
 })();

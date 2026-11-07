@@ -241,7 +241,7 @@
     else if (online) status = S.myPick != null ? (S.opPick != null ? 'Começando…' : 'Aguardando seu amigo escolher…') : (S.opPick != null ? 'Seu amigo já escolheu. Sua vez!' : 'Escolha seu cavaleiro.');
     else status = S.mode === 'weekly' ? 'Chefe da semana: escolha o cavaleiro para o duelo.' : S.mode === 'torre' ? 'Torre: escolha o cavaleiro para subir o mais alto que conseguir.' : 'Santuário: escolha o cavaleiro que vai atravessar as Casas do Zodíaco.';
     $('#select .selinfo').innerHTML = `<b>${esc(c.passive.split('\n')[0])}</b> ${esc(c.passive.split('\n').slice(1).join(' '))}<br>` +
-      `Vida ${selHp(c)} · Força ${c.stats.attPower} · Defesa ${c.stats.defPower} · Especial: ${esc(c.special.tittle)}<br><span style="color:#9fe8ff">${esc(status)}</span>`;
+      `${c.unique ? `<b style="color:#ffd34d">★ ${esc(c.unique)}:</b> ${esc(c.uniqueDesc)}<br>` : ''}Vida ${selHp(c)} · Força ${c.stats.attPower} · Defesa ${c.stats.defPower} · Especial: ${esc(c.special.tittle)}<br><span style="color:#9fe8ff">${esc(status)}</span>`;
     if (online && S.myPick == null && tSize() > 1) $('#select .selinfo').innerHTML += `<br><span style="color:#ffcf40">Monte a equipe: cavaleiro ${S.myTeam.length + 1} de ${tSize()}.</span>`;
     $('#select [data-act=confirm]').disabled = online && (S.myPick != null || (S.rules && S.rules.pick === 'draft' && firstPicker() !== S.me && S.opPick == null));
     if (online && S.rules) { const el = $('#select .selinfo'); el.innerHTML += `<br><span style="color:#ffcf40">Regras: ${esc(rulesText(S.rules))}</span>`; }
@@ -567,7 +567,8 @@
     const swipe = Math.random() < 0.4; let q;
     if (swipe) { const want = ['up', 'left', 'right'][Math.floor(Math.random() * 3)]; q = await mgSwipe(pi, want, S.easy ? 1500 : 1100, 'APARE! Deslize na direção da seta'); }
     else q = await mgTap(pi);
-    if (q === 2) { const c = await mgSwipe(pi, 'up', 1000, 'CONTRA-GOLPE! Deslize para cima'); if (c === 2 || c === 1) q = 3; }
+    const V = S.view, canCtr = !V || (V.p[1 - pi].stance !== 2 && E.cur(V.p[pi]).defPower > E.cur(V.p[1 - pi]).defPower);   // contra-golpe só se o atacante não for defensivo e a Defesa for maior
+    if (q === 2 && canCtr) { const c = await mgSwipe(pi, 'up', 1000, 'CONTRA-GOLPE! Deslize para cima'); if (c === 2 || c === 1) q = 3; }
     return q;
   }
   function mgPrec(pi) {   // ponto fraco do oponente: toque nele para um golpe preciso
@@ -677,6 +678,9 @@
     f.classList.toggle('c-on', k > 0.04); f.classList.toggle('c-max', k >= 0.995); f.classList.toggle('c-dark', auraKey(p, h.stance) === 'dark');
   }
   const stanceFx = () => {};
+  // ícones de postura (SVG, sem emoji): espada = ofensiva, escudo = defensiva
+  const ST_SW = '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 38L36 12M30 10h8v8M14 30l8 8M8 40l4-4M38 38L12 12M10 10h8M10 10v8" stroke-width="3.5"/></svg>';
+  const ST_SH = '<svg viewBox="0 0 48 48"><path d="M24 4l16 6v12c0 10-7 17-16 22C15 39 8 32 8 22V10z" fill="currentColor"/><path d="M24 10l10 4v8c0 6-4 11-10 15z" fill="rgba(255,255,255,.35)"/></svg>';
   // o Mestre do Santuário aparece como "???" até assumir uma postura; aí revela quem é: Saga de Gêmeos
   const revealed = p => p.charId === 20 && !!p.stance;
   function hudName(p, side) {
@@ -890,6 +894,9 @@
       fAura(side, st.p[pi], h);
       { const rg = el.querySelector('.rage'); rg.style.display = st.norage ? 'none' : ''; const ready = h.rage >= 100 && !(h.ult && h.sense); rg.classList.toggle('ready', ready); rg.classList.toggle('used', !!(h.ult && h.sense)); { const sb = $('#battle .pd.' + side + ' .star'); if (sb) sb.classList.toggle('glow', ready); } rg.querySelector('i').style.width = Math.min(100, h.rage) + '%'; rg.querySelector('b').textContent = (h.ult && h.sense) ? 'PODERES USADOS' : ready ? 'PRONTO' : (h.senseOn ? '8º SENTIDO ✦ ' : 'FÚRIA ') + h.rage + '%'; }
       el.querySelector('.plate span').textContent = ['NEUTRA', 'OFENSIVA', 'DEFENSIVA'][h.stance];
+      el.querySelector('.plate').dataset.st = h.stance;
+      { const pe = $('#battle .pd.' + side); if (pe) { pe.dataset.st = h.stance; { const fe = $('#battle .fighter.' + side); if (fe) fe.dataset.st = h.stance; } let b = pe.querySelector('.stic'); if (!b) { b = document.createElement('i'); b.className = 'stic'; pe.appendChild(b); }
+        if (b.dataset.k !== String(h.stance)) { b.dataset.k = h.stance; b.innerHTML = h.stance === 1 ? ST_SW : h.stance === 2 ? ST_SH : ''; } } }
       const pd = $('#battle .pd.' + side);
       pd.querySelector('.att').textContent = Math.round(h.att); pd.querySelector('.def').textContent = Math.round(h.def);
     });
@@ -1076,6 +1083,7 @@
     const p = v.p[side === 'me' ? S.me : 1 - S.me], c = CH[p.charId];
     $('#mInfo .ttl').textContent = revealed(p) ? 'Saga de Gêmeos' : c.title;
     let html = `<div class="it good"><b>${esc(c.passive.split('\n')[0])}</b><div>${esc(c.passive.split('\n').slice(1).join('\n'))}</div></div>`;
+    if (c.unique && (p.charId !== 20 || revealed(p))) html += `<div class="it good"><b>★ ${esc(c.unique)}</b><div>${esc(c.uniqueDesc)}</div></div>`;
     html += `<div class="it"><b>Especial: ${esc(c.special.tittle)}</b><div>${esc(c.special.description)} (custo ${Math.abs(c.special.statsRequired.cosmo)})</div></div>`;
     if (!p.debuffs.length) html += '<div class="it"><div>Nenhum efeito ativo.</div></div>';
     for (const d of p.debuffs) {
