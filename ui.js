@@ -156,7 +156,7 @@
     },
   };
   function updOpt() {
-    const tm = '🎵 Música: ' + (Snd.muted ? 'desligada' : 'ligada'), ts = '🔊 Efeitos sonoros: ' + (Snd.sfxOff ? 'desligados' : 'ligados'), tf = '⛶ Tela cheia: ' + (document.fullscreenElement ? 'desativar' : 'ativar'), tr = '👆 Reações por toque: ' + (rOn('guard') ? 'ligadas' : 'desligadas');
+    const tm = '🎵 Música: ' + (Snd.muted ? 'desligada' : 'ligada'), ts = '🔊 Efeitos sonoros: ' + (Snd.sfxOff ? 'desligados' : 'ligados'), tf = '⛶ Tela cheia: ' + (fsEl() ? 'desativar' : !fsApi() ? (standalone() ? 'ativa (modo app)' : 'como ativar no iPhone') : 'ativar'), tr = '👆 Reações por toque: ' + (rOn('guard') ? 'ligadas' : 'desligadas');
     [['#optMusic', tm], ['#qMusic', tm], ['#optSfx', ts], ['#qSfx', ts], ['#optFs', tf], ['#qFs', tf]].forEach(([s, t]) => { const el = $(s); if (el) el.textContent = t; });
   }
   document.addEventListener('fullscreenchange', () => { try { updOpt(); } catch (e) {} });
@@ -547,11 +547,11 @@
     });
   }
   function mgSwipe(pi, want, T, lbl) {   // deslize na direção indicada: 'up' | 'left' | 'right'
-    const [x, y] = chest(pi), AR = { up: '⬆', left: '⬅', right: '➡' };
+    const [x, y] = chest(pi), ROT = { up: 0, right: 90, left: 270 };
     return mgRun((el, done, arm) => {
       el.dataset.x = x; el.dataset.y = y;
       el.appendChild(mk('rg-lbl', x, y - 190, lbl));
-      el.appendChild(mk('rg-arrow', x, y, AR[want]));
+      { const ar = mk('rg-arrow', x, y); ar.innerHTML = `<svg viewBox="0 0 100 100" style="transform:rotate(${ROT[want]}deg)"><path d="M50 6 L92 52 H66 V94 H34 V52 H8 Z"/></svg>`; el.appendChild(ar); }
       const t0 = performance.now(); let sx = 0, sy = 0, td = 0, down = false; Snd.play('sfx_card_zoom', .6);
       const judge = e => { if (!down) return; const [gx, gy] = toGame(e.clientX - sx, e.clientY - sy), len = Math.hypot(gx, gy);
         if (len < 22 * scale) return; down = false; ripple(el, e, 'good');
@@ -1224,6 +1224,17 @@
   }
 
   // ---------- online
+  function leftRoom() {   // o outro jogador saiu: avisa e, depois de ler, volta para a tela de multiplayer (procura de sala)
+    S.G = null; S.view = null; S.queue = []; S.race = null; S.running = false; S.busyR = false; S.pending = false; S.starting = false;
+    const r = $('#react'); if (r) { r.classList.remove('on'); r.innerHTML = ''; }
+    msg('O outro jogador saiu da sala.', () => {
+      if (S.link) { try { S.link.close(); } catch (e) {} S.link = null; }
+      $$('.modal.on').forEach(m => { if (m.id !== 'mMsg') m.classList.remove('on'); });
+      S.mode = null; S.left = false; S.opPick = null; S.myPick = null; S.rules = null;
+      $('#onChoice').style.display = 'flex'; $('#onWait').style.display = 'none'; $('#onRules').style.display = 'none'; $('#onMsg').textContent = '';
+      show('online');
+    });
+  }
   function netHandlers() {
     return {
       code: c => { $('#codeOut').textContent = c; $('#onChoice').style.display = 'none'; $('#onWait').style.display = 'flex'; $('#onStatus').textContent = 'Aguardando seu amigo entrar…'; S.code = c; },
@@ -1237,13 +1248,13 @@
       data: onNet,
       close: () => {
         if (S.race) { S.race.fr.gone = true; S.race.fr.dead = true; S.link = null; toast('Seu amigo saiu da partida.'); updRace(); if (S.race.waiting) raceResult(); return; }
-        if (S.mode === 'host' || S.mode === 'guest') { S.link = null; msg('A conexão com o seu amigo caiu.', goMenu); } },
+        if (S.mode === 'host' || S.mode === 'guest') { S.link = null; S.left = true; leftRoom(); } },
       error: t => {
         const m = { 'peer-unavailable': 'Sala não encontrada. Confira o código.', 'network': 'Sem conexão com o servidor. Verifique a internet.',
           'server-error': 'Servidor de salas indisponível. Tente de novo.', 'timeout': 'Não foi possível conectar. Tentem os dois na mesma rede Wi-Fi ou de novo em instantes.',
           'browser-incompatible': 'Este navegador não suporta jogo online.', 'lib': 'Não consegui carregar o módulo online. Verifique a internet.' }[t] || ('Erro de conexão: ' + t);
         $('#onMsg').textContent = m; if (S.link) { S.link.close(); S.link = null; }
-        $('#onChoice').style.display = 'flex'; $('#onWait').style.display = 'none';
+        $('#onChoice').style.display = 'flex'; $('#onWait').style.display = 'none'; $('#onRules').style.display = 'none';
       },
     };
   }
@@ -1253,7 +1264,7 @@
     else if (m.k === 'race' && S.race) { S.race.fr = { cleared: m.c, dead: !!m.d }; updRace(); if (S.race.waiting && m.d) raceResult(); }
     else if (m.k === 'clash') { S.myPick = null; S.opPick = null; S.myTeam = []; S.opTeam = null; S.keepSent = false; openSelect(); toast('Os dois escolheram o mesmo cavaleiro. Escolham de novo!', 3000); }
     else if (m.k === 'pick') { S.opPick = m.c; S.opTeam = m.t || [m.c]; if ($('#select').classList.contains('on')) renderSelect(); maybeStartOnline(); }
-    else if (m.k === 'begin') { S.me = 1; S.queue = []; S.gameNo = (S.gameNo || 0) + 1; S.friendIn = false; S.keepSent = false; if (!S.series) S.series = newSeries(); S.series.chars = [m.c0, m.c1]; S.series.teams = [m.tm0 || [m.c0], m.tm1 || [m.c1]]; vsScreen(m.c1, m.c0, m.info).then(() => { enterBattle(true); if (S.queue.length && !S.running) runQueue(); }); }
+    else if (m.k === 'begin') { S.me = 1; S.queue = []; S.gameNo = (S.gameNo || 0) + 1; S.friendIn = false; S.keepSent = false; if (!S.series) S.series = newSeries(); S.series.chars = [m.c0, m.c1]; S.series.teams = [m.tm0 || [m.c0], m.tm1 || [m.c1]]; vsScreen(m.c1, m.c0, m.info).then(() => { if (S.left || !S.link) return; enterBattle(true); if (S.queue.length && !S.running) runQueue(); }); }
     else if (m.k === 'upd' && S.mode === 'guest') {
       if (!$('#battle').classList.contains('on')) { S.queue.push({ ev: m.ev, st: m.st }); return; }
       deliver(m.ev, m.st);
@@ -1284,18 +1295,23 @@
     S.gameNo = (S.gameNo || 0) + 1; S.friendIn = false; S.keepSent = false; if (!S.series) S.series = newSeries(); S.series.chars = [S.myPick, S.opPick]; S.series.teams = [mt, ot];
     S.link.send({ k: 'begin', c0: S.myPick, c1: S.opPick, info, tm0: mt, tm1: ot });
     await vsScreen(S.myPick, S.opPick, info);
-    S.G = G; enterBattle(); S.starting = false; pump();
+    S.starting = false; if (S.left || !S.link) return;
+    S.G = G; enterBattle(); pump();
   }
   async function hostRoom() {
     $('#onMsg').textContent = 'Criando sala…'; S.mode = 'host'; S.netRole = 'host'; S.series = newSeries(); S.gameNo = 0; S.race = null;
-    writeRules(S.rules || DEF_RULES); $('#onRules').style.display = 'flex';
+    writeRules(S.rules || DEF_RULES); $('#onChoice').style.display = 'none'; $('#onWait').style.display = 'none'; $('#onRules').style.display = 'flex';
+    $('#onMsg').textContent = 'Escolha as opções do jogo e toque em "Salvar opções e gerar o código".';
+  }
+  async function hostGo() {   // só depois de salvar as opções a sala é criada e o código aparece
+    readRules(); S.left = false; $('#onRules').style.display = 'none'; $('#onMsg').textContent = 'Criando sala…';
     S.link = new Net.Link(netHandlers());
     try { await S.link.host(); $('#onMsg').textContent = ''; } catch (e) { netHandlers().error('lib'); }
   }
   async function joinRoom() {
     const c = $('#codeIn').value.trim().toUpperCase();
     if (c.length !== 5) { $('#onMsg').textContent = 'Digite o código de 5 letras que seu amigo recebeu.'; return; }
-    $('#onMsg').textContent = 'Conectando…'; S.mode = 'guest'; S.netRole = 'guest'; S.rules = null; S.series = newSeries(); S.gameNo = 0; S.race = null;
+    $('#onMsg').textContent = 'Conectando…'; S.left = false; S.mode = 'guest'; S.netRole = 'guest'; S.rules = null; S.series = newSeries(); S.gameNo = 0; S.race = null;
     S.link = new Net.Link(netHandlers());
     try { await S.link.join(c); } catch (e) { netHandlers().error('lib'); }
   }
@@ -1377,6 +1393,7 @@
       case 'help': helpI = 0; $('#help .slides').style.backgroundImage = url('instr1'); show('help'); break;
       case 'next': helpI = (helpI + 1) % 3; $('#help .slides').style.backgroundImage = url('instr' + (helpI + 1)); break;
       case 'host': fullscreen(true); hostRoom(); break;
+      case 'hostgo': hostGo(); break;
       case 'join': fullscreen(true); joinRoom(); break;
       case 'share': {
         const t = `Bora jogar CosmoCards! Abre o jogo, toca em "Online" → "Entrar na sala" e digita o código: ${S.code}`;
@@ -1415,11 +1432,18 @@
     }
   });
   function copy(t) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copiado!'), () => toast(t, 4000)); }
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+  const fsApi = () => !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  const standalone = () => !!(window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
   function fullscreen(soft) {
     const d = document, el = d.documentElement;
-    if (d.fullscreenElement) { if (!soft) d.exitFullscreen().catch(() => {}); return; }
+    if (fsEl()) { if (!soft) (d.exitFullscreen || d.webkitExitFullscreen).call(d); return; }
     if (soft && !/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) return;
-    const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : null;
+    if (!fsApi()) {   // iPhone (Safari não tem tela cheia para páginas): só funciona instalando na Tela de Início
+      if (!soft) toast(standalone() ? 'Você já está em tela cheia (modo app).' : 'No iPhone: toque em Compartilhar (quadrado com seta) › "Adicionar à Tela de Início" e abra o jogo pelo ícone para jogar em tela cheia.', 6500);
+      return;
+    }
+    const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : (el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null);
     if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }).catch(() => {});
   }
   $('#codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });

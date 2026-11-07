@@ -467,6 +467,7 @@ button{font-family:inherit}
 .rg-lbl.ok{color:#9fffb0;border-color:#5dff9e}.rg-lbl.no{color:#ff9a8a;border-color:#ff5a4a}
 .rg-ring{position:absolute;transform:translate(-50%,-50%);border:6px solid #ffe08a;border-radius:50%;box-shadow:0 0 22px #ffcf40,inset 0 0 18px rgba(255,220,120,.5);pointer-events:none}
 .rg-ring.tgt{border-color:rgba(255,255,255,.9);border-style:dashed;box-shadow:0 0 12px #fff}
+.rg-arrow svg{width:1em;height:1em;display:block;fill:currentColor;filter:drop-shadow(0 0 12px #ffb000) drop-shadow(0 4px 6px #000)}
 .rg-arrow{position:absolute;transform:translate(-50%,-50%);font-size:120px;line-height:1;color:#ffe08a;text-shadow:0 0 22px #ffb000,0 4px 10px #000;pointer-events:none;animation:rga .5s ease-in-out infinite alternate}
 @keyframes rga{to{transform:translate(-50%,-62%) scale(1.12)}}
 .rg-weak{position:absolute;width:86px;height:86px;transform:translate(-50%,-50%);border-radius:50%;border:4px solid #ff4a3a;background:radial-gradient(circle,rgba(255,255,255,.95) 0 14%,rgba(255,80,60,.55) 15% 55%,rgba(255,80,60,0) 70%);box-shadow:0 0 24px #ff3a2a;cursor:pointer;animation:rgw .45s ease-in-out infinite alternate}
