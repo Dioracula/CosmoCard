@@ -311,7 +311,7 @@
       if (Math.abs(dx) > 60) { S.santIdx = Math.max(0, Math.min(HOUSES.length - 1, S.santIdx + (dx < 0 ? 1 : -1))); Snd.play('sfx_card_out', .6); renderSant(); }
     });
   })();
-  function santFight(i) { S.santCur = i; startLocal(S.myPick, HOUSES[i][0], HOUSES[i][1], { hp: 500, b1: { life: i * 25 }, wx: Mo.WX[i % Mo.WX.length].id }); }
+  function santFight(i) { S.santCur = i; startLocal(S.myPick, HOUSES[i][0], HOUSES[i][1], { hpMul: 1.5, b1: { life: i * 25 }, wx: Mo.WX[i % Mo.WX.length].id }); }
 
   // ---------- desbloqueio
   function showUnlocks(ids, done) {
@@ -393,7 +393,7 @@
   }
   function startWeekly() {
     const w = Mo.weekly(); S.wk = w;
-    startLocal(S.myPick, w.boss, 'Chefe da Semana', { hp: 500, mod: w.mod, wx: w.wx, b0: Mo.rankBonus(store.get('stars', 0)), b1: w.scale });
+    startLocal(S.myPick, w.boss, 'Chefe da Semana', { hpMul: 1.5, mod: w.mod, wx: w.wx, b0: Mo.rankBonus(store.get('stars', 0)), b1: w.scale });
   }
 
   // ---------- Torre (modo roguelike)
@@ -422,7 +422,7 @@
   function towerFight() {
     const R = S.run, f = R.floor; modal('mTower', false);
     const es = Mo.enemyScale(f); if (Mo.isBossFloor(f)) es.life += 120;
-    startLocal(R.char, R.enemy, 'Torre · Andar ' + f + (Mo.isBossFloor(f) ? ' · Chefe' : ''), { hp: 450, mod: R.mod, wx: Mo.rollWx(f >= 4 ? 0.45 : 0), b0: Object.assign(Mo.sumBless(R.bless, R.rank), { relics: R.relics.slice() }), b1: es });
+    startLocal(R.char, R.enemy, 'Torre · Andar ' + f + (Mo.isBossFloor(f) ? ' · Chefe' : ''), { hpMul: 1.4, mod: R.mod, wx: Mo.rollWx(f >= 4 ? 0.45 : 0), b0: Object.assign(Mo.sumBless(R.bless, R.rank), { relics: R.relics.slice() }), b1: es });
   }
   function towerBless() {
     const R = S.run, rel = (R.floor - 1) % 3 === 0 && Mo.pickRelics(R.relics).length > 0;
@@ -1133,10 +1133,10 @@
     '37_ataques_opressivos': 'sfx_chute_cosmico', '38_afinidade_com_o_signo': 'sfx_afinidade_com_signo' };
 
   // ---------- regras da sala online
-  // vida que o cavaleiro tem de verdade na luta, conforme o modo (Santuário 500, Chefe da Semana 500, Torre 450, Solo/online = regra escolhida)
+  // vida que o cavaleiro tem de verdade na luta, conforme o modo (Santuário/Chefe ×1,5, Torre ×1,4, Solo/online = regra escolhida)
   function selHp(c) {
-    if (S.mode === 'sant' || S.mode === 'weekly') return 500;
-    if (S.mode === 'torre') return 450;
+    if (S.mode === 'sant' || S.mode === 'weekly') return Math.round(c.stats.life * 1.5 / 10) * 10;
+    if (S.mode === 'torre') return Math.round(c.stats.life * 1.4 / 10) * 10;
     if (S.mode === 'cpu') return soloT().hp || c.stats.life;
     if (S.mode === 'host' || S.mode === 'guest') return (S.rules && S.rules.hp) || c.stats.life;
     return c.stats.life;
@@ -1163,7 +1163,7 @@
     if ((r.team || 1) > 1 && r.fmt !== 'tower') p.push('Equipe: ' + teamTxt(r));
     return p.join(' · ');
   }
-  const hpOpts = '<option value="0">Padrão do personagem (250 a 400)</option>' + Array.from({ length: 59 }, (_, i) => 100 + i * 50).map(v => `<option value="${v}">${v} de vida</option>`).join('');
+  const hpOpts = '<option value="0">Padrão do personagem (290 a 450)</option>' + Array.from({ length: 59 }, (_, i) => 100 + i * 50).map(v => `<option value="${v}">${v} de vida</option>`).join('');
   function fillRuleSelects() {
     $('#rHp').innerHTML = hpOpts; $('#tHp').innerHTML = hpOpts;
     $('#rMod').innerHTML = '<option value="">Nenhum</option><option value="random">Sorteado a cada luta</option>' + Mo.MODS.map(m => `<option value="${m.id}">${m.ic} ${esc(m.name)}</option>`).join('');

@@ -25,6 +25,14 @@
   });
   const SEVENTH = D.cards.findIndex(c => c.cardAction === 'SeventhSense');
 
+  // vida, Força e Defesa por personagem (inspirado no ranking de poder do anime: Shaka > Saga > Aioria > Aioros > Camus > Mu > Shura > Milo > Aldebaran > Afrodite > Máscara da Morte;
+  // bronzes: Seiya > Ikki > Shun > Shiryu > Hyoga; Aldebaran é o mais resistente)
+  const CHAR_STATS = { // id: [vida, força, defesa]
+    0: [330, 21, 19], 21: [310, 19, 19], 4: [320, 24, 18], 2: [290, 15, 25], 1: [310, 20, 22], 3: [290, 20, 18],
+    11: [340, 32, 30], 16: [360, 30, 27], 9: [360, 31, 22], 19: [370, 27, 28], 8: [340, 27, 27], 5: [350, 26, 29],
+    13: [340, 30, 24], 12: [340, 28, 24], 6: [450, 22, 32], 15: [320, 25, 22], 7: [330, 24, 24], 18: [350, 26, 26], 20: [400, 30, 28],
+  };
+  D.chars.forEach(c => { const s = CHAR_STATS[c.id]; if (s) { c.stats.maxLife = c.stats.life = s[0]; c.stats.attPower = s[1]; c.stats.defPower = s[2]; } });
   // pequenos ajustes onde o dado original contradiz o texto da carta
   D.chars.forEach(c => {
     const s = c.special;
@@ -102,6 +110,7 @@
       tr: Object.assign({ swap: 'free', assist: true, syn: true, last: false }, opts.tr || {}) };
     G.wx = opts.wx || null;
     [opts.t0, opts.t1].forEach((t, i) => { if (t && t.length) buildTeam(G, G.p[i], [i ? c1 : c0].concat(t), G.tr.syn ? synergies([i ? c1 : c0].concat(t)) : []); });
+    if (opts.hpMul > 0) G.p.forEach(p => { [p.stats].concat((p.bench || []).map(b => b.stats)).forEach(st => { st.maxLife = st.life = Math.round(st.maxLife * opts.hpMul / 10) * 10; }); });   // vida proporcional (Santuário, Torre, Chefe)
     if (opts.hp >= 50) G.p.forEach(p => { [p.stats].concat((p.bench || []).map(b => b.stats)).forEach(st => { st.maxLife = st.life = Math.round(opts.hp); }); });   // vida escolhida (de 50 em 50)
     applyBonus(G.p[0], opts.b0); applyBonus(G.p[1], opts.b1);
     if (G.wx === 'eclipse') G.p.forEach(p => { p.specialDisc = 25; });
