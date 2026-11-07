@@ -603,7 +603,12 @@
     while (S.queue.length) {
       const { ev, st } = S.queue.shift();
       if (!S.view) { S.view = st; render(); }
-      for (const e of ev) { try { await anim(e, st); } catch (err) { console.error(err); } }
+      for (let i = 0; i < ev.length; i++) {
+        const e = ev[i], nx = ev[i + 1];
+        // avisos/efeitos que vêm logo antes do dano não seguram o golpe: aparecem junto com ele
+        const pre = nx && nx.t === 'dmg' && nx.v > 0 && (e.t === 'passive' || e.t === 'stat' || e.t === 'debuff' || e.t === 'needles' || (e.t === 'text' && e.kind !== 'counter' && e.txt !== 'GRANDE CHIFRE!'));
+        try { if (pre) { anim(e, st).catch(err => console.error(err)); await wait(60); } else await anim(e, st); } catch (err) { console.error(err); }
+      }
       S.view = st; render();
     }
     S.running = false; S.pending = false; render();
