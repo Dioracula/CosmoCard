@@ -157,7 +157,7 @@
   };
   function updOpt() {
     const tm = '🎵 Música: ' + (Snd.muted ? 'desligada' : 'ligada'), ts = '🔊 Efeitos sonoros: ' + (Snd.sfxOff ? 'desligados' : 'ligados'), tf = '⛶ Tela cheia: ' + (document.fullscreenElement ? 'desativar' : 'ativar'), tr = '👆 Reações por toque: ' + (rOn('guard') ? 'ligadas' : 'desligadas');
-    [['#optMusic', tm], ['#qMusic', tm], ['#optSfx', ts], ['#qSfx', ts], ['#optFs', tf], ['#qFs', tf], ['#qReact', tr], ['#optReact', tr]].forEach(([s, t]) => { const el = $(s); if (el) el.textContent = t; });
+    [['#optMusic', tm], ['#qMusic', tm], ['#optSfx', ts], ['#qSfx', ts], ['#optFs', tf], ['#qFs', tf]].forEach(([s, t]) => { const el = $(s); if (el) el.textContent = t; });
   }
   document.addEventListener('fullscreenchange', () => { try { updOpt(); } catch (e) {} });
   function sndIcons() {
@@ -470,7 +470,7 @@
     applyR(S.me, a);
   }
   // ---------- reações por toque: Guarda Perfeita / Aparar / Contra-golpe (defesa) e Golpe Preciso (ataque)
-  const rOn = k => store.get('react_' + k, true) !== false;
+  const rOn = k => S.mode === 'cpu' ? soloT().react !== false : (S.mode === 'host' || S.mode === 'guest') ? !(S.rules && S.rules.react === false) : true;   // só o Solo (opções da luta) e o anfitrião (regras da sala) podem desligar
   function viewAtk(a) {
     if (a.type !== 'play') return false;   // cartas especiais e Golpe Assinatura não têm reação por toque
     const P = S.view.p[S.me], h = P.hand.find(x => x.uid === a.uid), c = h && E.cardOf(P, h.ref); return !!(c && c.offensive && !c.special);
@@ -1141,8 +1141,8 @@
     if (S.mode === 'host' || S.mode === 'guest') return (S.rules && S.rules.hp) || c.stats.life;
     return c.stats.life;
   }
-  const DEF_RULES = { hp: 0, fmt: 'single', pick: 'free', mod: '', wx: '', epic: false, norage: false, filter: 'all', team: 1, swap: 'free', assist: true, syn: true, last: false };
-  const TDEF = { hp: 0, team: 1, swap: 'free', assist: true, syn: true, last: false };
+  const DEF_RULES = { react: true, hp: 0, fmt: 'single', pick: 'free', mod: '', wx: '', epic: false, norage: false, filter: 'all', team: 1, swap: 'free', assist: true, syn: true, last: false };
+  const TDEF = { react: true, hp: 0, team: 1, swap: 'free', assist: true, syn: true, last: false };
   const soloT = () => Object.assign({}, TDEF, store.get('teamRules', {}));
   const tSize = () => { if (onl()) { const r = S.rules || DEF_RULES; return r.fmt === 'tower' ? 1 : (r.team || 1); } return soloT().team; };
   const teamTxt = r => { const p = [{ 1: 'Solo', 2: 'Dupla', 3: 'Trio' }[r.team]]; p.push({ free: 'troca 10 cosmo', gratis: 'troca grátis', fall: 'troca só ao cair' }[r.swap]); if (!r.assist) p.push('sem assistência'); if (!r.syn) p.push('sem sinergias'); if (r.last) p.push('Último Cavaleiro'); return p.join(', '); };
@@ -1157,7 +1157,7 @@
     r = r || DEF_RULES; const p = [{ single: 'Luta única', bo3: 'Melhor de 3', tower: 'Torre a dois' }[r.fmt] || 'Luta única'];
     if (r.mod === 'random') p.push('Evento sorteado'); else if (r.mod) { const m = Mo.modById(r.mod); if (m) p.push('Evento: ' + m.name); }
     if (r.wx === 'random') p.push('Clima sorteado'); else if (r.wx) { const w = Mo.wxById(r.wx); if (w) p.push('Clima: ' + w.name); }
-    if (r.hp) p.push('Vida ' + r.hp); if (r.epic) p.push('Batalha Épica'); if (r.norage) p.push('Sem Fúria');
+    if (r.react === false) p.push('Sem reações por toque'); if (r.hp) p.push('Vida ' + r.hp); if (r.epic) p.push('Batalha Épica'); if (r.norage) p.push('Sem Fúria');
     if (r.filter === 'zod') p.push('Só Zodíacos'); if (r.filter === 'bronze') p.push('Só Bronzes');
     if (r.pick === 'mirror') p.push('Espelho proibido'); if (r.pick === 'draft') p.push('Draft');
     if ((r.team || 1) > 1 && r.fmt !== 'tower') p.push('Equipe: ' + teamTxt(r));
@@ -1170,25 +1170,25 @@
     $('#rWx').innerHTML = '<option value="">Nenhum</option><option value="random">Sorteado a cada luta</option>' + Mo.WX.map(w => `<option value="${w.id}">${w.ic} ${esc(w.name)}</option>`).join('');
   }
   function readRules() {
-    S.rules = { hp: +$('#rHp').value, fmt: $('#rFmt').value, pick: $('#rPick').value, mod: $('#rMod').value, wx: $('#rWx').value, epic: $('#rEpic').value === '1', norage: $('#rRage').value === '0', filter: $('#rFilter').value,
+    S.rules = { react: $('#rReact').value !== '0', hp: +$('#rHp').value, fmt: $('#rFmt').value, pick: $('#rPick').value, mod: $('#rMod').value, wx: $('#rWx').value, epic: $('#rEpic').value === '1', norage: $('#rRage').value === '0', filter: $('#rFilter').value,
       team: +$('#rTeam').value, swap: $('#rSwap').value, assist: $('#rAssist').value === '1', syn: $('#rSyn').value === '1', last: $('#rLast').value === '1' };
     $('#rSum').textContent = rulesText(S.rules);
   }
   function writeRules(r) {
-    $('#rHp').value = String(r.hp || 0); $('#rFmt').value = r.fmt; $('#rPick').value = r.pick; $('#rMod').value = r.mod; $('#rWx').value = r.wx; $('#rEpic').value = r.epic ? '1' : '0'; $('#rRage').value = r.norage ? '0' : '1'; $('#rFilter').value = r.filter;
+    $('#rReact').value = r.react === false ? '0' : '1'; $('#rHp').value = String(r.hp || 0); $('#rFmt').value = r.fmt; $('#rPick').value = r.pick; $('#rMod').value = r.mod; $('#rWx').value = r.wx; $('#rEpic').value = r.epic ? '1' : '0'; $('#rRage').value = r.norage ? '0' : '1'; $('#rFilter').value = r.filter;
     $('#rTeam').value = r.team || 1; $('#rSwap').value = r.swap || 'free'; $('#rAssist').value = r.assist === false ? '0' : '1'; $('#rSyn').value = r.syn === false ? '0' : '1'; $('#rLast').value = r.last ? '1' : '0';
     readRules();
   }
   fillRuleSelects();
-  ['rHp', 'rFmt', 'rPick', 'rMod', 'rWx', 'rEpic', 'rRage', 'rFilter', 'rTeam', 'rSwap', 'rAssist', 'rSyn', 'rLast'].forEach(id => $('#' + id).addEventListener('change', readRules));
+  ['rReact', 'rHp', 'rFmt', 'rPick', 'rMod', 'rWx', 'rEpic', 'rRage', 'rFilter', 'rTeam', 'rSwap', 'rAssist', 'rSyn', 'rLast'].forEach(id => $('#' + id).addEventListener('change', readRules));
   function readSoloT() {
-    const t = { hp: +$('#tHp').value, team: +$('#tTeam').value, swap: $('#tSwap').value, assist: $('#tAssist').value === '1', syn: $('#tSyn').value === '1', last: $('#tLast').value === '1' };
-    store.set('teamRules', t); $('#tSum').textContent = (t.hp ? 'Vida de cada cavaleiro: ' + t.hp + '. ' : '') + (t.team > 1 ? 'Equipe: ' + teamTxt(t) : 'Sem equipe: você luta com um cavaleiro só.');
+    const t = { react: $('#tReact').value !== '0', hp: +$('#tHp').value, team: +$('#tTeam').value, swap: $('#tSwap').value, assist: $('#tAssist').value === '1', syn: $('#tSyn').value === '1', last: $('#tLast').value === '1' };
+    store.set('teamRules', t); $('#tSum').textContent = (t.react === false ? 'Sem reações por toque. ' : '') + (t.hp ? 'Vida de cada cavaleiro: ' + t.hp + '. ' : '') + (t.team > 1 ? 'Equipe: ' + teamTxt(t) : 'Sem equipe: você luta com um cavaleiro só.');
     if ($('#select').classList.contains('on')) renderSelect();
   }
-  ['tHp', 'tTeam', 'tSwap', 'tAssist', 'tSyn', 'tLast'].forEach(id => $('#' + id).addEventListener('change', readSoloT));
+  ['tReact', 'tHp', 'tTeam', 'tSwap', 'tAssist', 'tSyn', 'tLast'].forEach(id => $('#' + id).addEventListener('change', readSoloT));
   function openTeamOpts() {
-    const t = soloT(); $('#tHp').value = String(t.hp || 0); $('#tTeam').value = t.team; $('#tSwap').value = t.swap; $('#tAssist').value = t.assist ? '1' : '0'; $('#tSyn').value = t.syn ? '1' : '0'; $('#tLast').value = t.last ? '1' : '0';
+    const t = soloT(); $('#tReact').value = t.react === false ? '0' : '1'; $('#tHp').value = String(t.hp || 0); $('#tTeam').value = t.team; $('#tSwap').value = t.swap; $('#tAssist').value = t.assist ? '1' : '0'; $('#tSyn').value = t.syn ? '1' : '0'; $('#tLast').value = t.last ? '1' : '0';
     readSoloT(); modal('mTeam');
   }
   // séries (melhor de 3) e escolhas
@@ -1317,7 +1317,6 @@
     switch (a) {
       case 'mute': Snd.toggle(); updOpt(); break;
       case 'sfx': Snd.toggleSfx(); updOpt(); break;
-      case 'react': { const on = !rOn('guard'); store.set('react_guard', on); store.set('react_prec', on); updOpt(); break; }
       case 'sigopen': { const I = S.view && E.sigInfo(S.view.p[S.me]); if (!I) break; if (!myFree()) { toast('Só no seu turno.'); break; }
         if (!I.ready) { toast(I.name + ': ' + I.prog + '/' + I.goal + ' ' + I.trig + (I.uses >= 2 ? ' · limite de 2 usos' : '')); break; }
         if (!I.can) { toast(I.name + ' pronto, mas custa ' + I.cost + ' de cosmo.'); break; }

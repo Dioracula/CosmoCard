@@ -123,6 +123,7 @@
           <label>Clima<select id="rWx"></select></label>
           <label>Vida (HP)<select id="rHp"></select></label>
           <label>Vida e cosmo<select id="rEpic"><option value="0">Normal</option><option value="1">Batalha Épica (+100 vida, +30 cosmo)</option></select></label>
+          <label>Reações por toque<select id="rReact"><option value="1">Ligadas</option><option value="0">Desligadas (para os dois)</option></select></label>
           <label>Fúria<select id="rRage"><option value="1">Ligada</option><option value="0">Desligada (sem Cosmo Final)</option></select></label>
           <label>Equipe<select id="rTeam"><option value="1">Solo (1 cavaleiro)</option><option value="2">Dupla</option><option value="3">Trio</option></select></label>
           <label>Troca<select id="rSwap"><option value="free">Livre (1x por turno, 10 cosmo)</option><option value="gratis">Livre e grátis (1x por turno)</option><option value="fall">Só quando o cavaleiro cai</option></select></label>
@@ -185,7 +186,7 @@
   <div class="modal" id="mEnd"><div class="endbox"><img alt=""><div class="note endmsg" style="font-size:18px"></div><div class="row"><button class="btn" data-act="again">Jogar de novo</button><button class="btn ghost" data-act="menu">Menu</button></div></div></div>
   <div class="modal" id="mMsg"><div class="card-panel" style="max-width:640px"><div class="note msg" style="font-size:19px"></div><div class="row"><button class="btn small" data-act="ok">OK</button></div></div></div>
   <div class="modal" id="mQuit"><div class="card-panel"><h3 style="margin:0;color:var(--gold);font-size:26px">Menu</h3>
-    <button class="btn" data-act="mute" id="qMusic"></button><button class="btn" data-act="sfx" id="qSfx"></button><button class="btn" data-act="fs" id="qFs"></button><button class="btn" data-act="react" id="qReact"></button>
+    <button class="btn" data-act="mute" id="qMusic"></button><button class="btn" data-act="sfx" id="qSfx"></button><button class="btn" data-act="fs" id="qFs"></button>
     <div class="row"><button class="btn small ghost" data-act="no">Continuar</button><button class="btn small" data-act="yes">Sair da partida</button></div></div></div>
   <div class="modal" id="mUnlock"><div class="unl"><img class="pf" data-src="popup" alt=""><img class="um" alt=""><img class="ut" data-src="t_unlock" alt="Personagem desbloqueado">
     <div class="utx"></div><button class="imgbtn uok" data-img="b_ok" data-act="unlockok" aria-label="OK"></button></div></div>
@@ -212,6 +213,7 @@
     <div class="row"><button class="btn small" data-act="ultgo">Cosmo Final</button><button class="btn small" data-act="sensego">8º Sentido</button><button class="btn small ghost" data-act="close">Cancelar</button></div></div></div>
   <div class="modal" id="mTeam"><div class="card-panel rgrid" style="min-width:560px;display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;color:var(--gold);font-size:26px">Opções da luta</h3>
     <label>Vida (HP) dos dois<select id="tHp"></select></label>
+    <label>Reações por toque<select id="tReact"><option value="1">Ligadas</option><option value="0">Desligadas</option></select></label>
     <label>Tamanho<select id="tTeam"><option value="1">Solo (1 cavaleiro)</option><option value="2">Dupla</option><option value="3">Trio</option></select></label>
     <label>Troca<select id="tSwap"><option value="free">Livre (1x por turno, 10 cosmo)</option><option value="gratis">Livre e grátis (1x por turno)</option><option value="fall">Só quando o cavaleiro cai</option></select></label>
     <label>Assistência na troca<select id="tAssist"><option value="1">Ligada (golpe ao entrar)</option><option value="0">Desligada</option></select></label>
