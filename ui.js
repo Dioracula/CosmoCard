@@ -241,7 +241,7 @@
     else if (online) status = S.myPick != null ? (S.opPick != null ? 'Começando…' : 'Aguardando seu amigo escolher…') : (S.opPick != null ? 'Seu amigo já escolheu. Sua vez!' : 'Escolha seu cavaleiro.');
     else status = S.mode === 'weekly' ? 'Chefe da semana: escolha o cavaleiro para o duelo.' : S.mode === 'torre' ? 'Torre: escolha o cavaleiro para subir o mais alto que conseguir.' : 'Santuário: escolha o cavaleiro que vai atravessar as Casas do Zodíaco.';
     $('#select .selinfo').innerHTML = `<b>${esc(c.passive.split('\n')[0])}</b> ${esc(c.passive.split('\n').slice(1).join(' '))}<br>` +
-      `Vida ${c.stats.life} · Força ${c.stats.attPower} · Defesa ${c.stats.defPower} · Especial: ${esc(c.special.tittle)}<br><span style="color:#9fe8ff">${esc(status)}</span>`;
+      `Vida ${selHp(c)} · Força ${c.stats.attPower} · Defesa ${c.stats.defPower} · Especial: ${esc(c.special.tittle)}<br><span style="color:#9fe8ff">${esc(status)}</span>`;
     if (online && S.myPick == null && tSize() > 1) $('#select .selinfo').innerHTML += `<br><span style="color:#ffcf40">Monte a equipe: cavaleiro ${S.myTeam.length + 1} de ${tSize()}.</span>`;
     $('#select [data-act=confirm]').disabled = online && (S.myPick != null || (S.rules && S.rules.pick === 'draft' && firstPicker() !== S.me && S.opPick == null));
     if (online && S.rules) { const el = $('#select .selinfo'); el.innerHTML += `<br><span style="color:#ffcf40">Regras: ${esc(rulesText(S.rules))}</span>`; }
@@ -1133,6 +1133,14 @@
     '37_ataques_opressivos': 'sfx_chute_cosmico', '38_afinidade_com_o_signo': 'sfx_afinidade_com_signo' };
 
   // ---------- regras da sala online
+  // vida que o cavaleiro tem de verdade na luta, conforme o modo (Santuário 500, Chefe da Semana 500, Torre 450, Solo/online = regra escolhida)
+  function selHp(c) {
+    if (S.mode === 'sant' || S.mode === 'weekly') return 500;
+    if (S.mode === 'torre') return 450;
+    if (S.mode === 'cpu') return soloT().hp || c.stats.life;
+    if (S.mode === 'host' || S.mode === 'guest') return (S.rules && S.rules.hp) || c.stats.life;
+    return c.stats.life;
+  }
   const DEF_RULES = { hp: 0, fmt: 'single', pick: 'free', mod: '', wx: '', epic: false, norage: false, filter: 'all', team: 1, swap: 'free', assist: true, syn: true, last: false };
   const TDEF = { hp: 0, team: 1, swap: 'free', assist: true, syn: true, last: false };
   const soloT = () => Object.assign({}, TDEF, store.get('teamRules', {}));
