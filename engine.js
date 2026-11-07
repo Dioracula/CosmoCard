@@ -102,6 +102,7 @@
       tr: Object.assign({ swap: 'free', assist: true, syn: true, last: false }, opts.tr || {}) };
     G.wx = opts.wx || null;
     [opts.t0, opts.t1].forEach((t, i) => { if (t && t.length) buildTeam(G, G.p[i], [i ? c1 : c0].concat(t), G.tr.syn ? synergies([i ? c1 : c0].concat(t)) : []); });
+    if (opts.hp >= 50) G.p.forEach(p => { [p.stats].concat((p.bench || []).map(b => b.stats)).forEach(st => { st.maxLife = st.life = Math.round(opts.hp); }); });   // vida escolhida (de 50 em 50)
     applyBonus(G.p[0], opts.b0); applyBonus(G.p[1], opts.b1);
     if (G.wx === 'eclipse') G.p.forEach(p => { p.specialDisc = 25; });
     if (G.mod === 'fragil') G.p.forEach(p => { p.stats.life = Math.max(1, Math.round(p.stats.maxLife * 0.6)); });
@@ -302,8 +303,8 @@
   }
 
   // ------------------------------------------------------------------ Reações por toque (Guarda Perfeita, Aparar, Golpe Preciso)
-  // guard: 0 nada · 1 bom (-45% dano) · 2 perfeito (-85%, +Fúria) · 3 perfeito + contra-golpe
-  // prec: 1 = golpe preciso (+25% de dano)
+  // guard: 0 nada · 1 bom (-25% dano) · 2 perfeito (-55%, +Fúria) · 3 perfeito + contra-golpe
+  // prec: 1 = golpe preciso (+15% de dano)
   function setReact(G, pi, a) {
     const p = G.p[pi], t = G.p[1 - pi];
     p.precQ = a && a.prec ? 1 : 0; t.guardQ = a && a.guard ? Math.max(0, Math.min(3, a.guard | 0)) : 0;
@@ -315,7 +316,7 @@
     if ((t.guardQ === 3 || t.guardQ1 === 3) && !G.over && p.stats.life > 0) {
       emit(G, { t: 'text', p: t.idx, txt: 'CONTRA-GOLPE!', kind: 'good', combo: true });
       // contra-golpe: dano fixo (sem Força/Defesa), proporcional ao que foi bloqueado, no máximo 12
-      updateStats(G, p, { life: -Math.max(3, Math.min(12, Math.round((G.reactPrev || 0) * 0.3))) }, true);
+      updateStats(G, p, { life: -Math.max(2, Math.min(8, Math.round((G.reactPrev || 0) * 0.2))) }, true);
       checkOver(G);
     }
     if (G.pbUsed) { p.debuffs = p.debuffs.filter(x => !x.precBoost); G.pbUsed = false; }
@@ -336,12 +337,12 @@
     }
     if (d > 0 && attacker !== target && attacker.precQ) {
       const pb = G.pbUsed || attacker.debuffs.some(x => x.precBoost); if (pb) G.pbUsed = true;
-      d = Math.round(d * (pb ? 1.5 : 1.25));
-      if (G.reactMsg && !G.reactMsg.prec) { G.reactMsg.prec = true; emit(G, { t: 'text', p: target.idx, txt: pb ? 'MIRA AGUÇADA! +50%' : 'GOLPE PRECISO!', kind: 'good', crit: true }); } }
+      d = Math.round(d * (pb ? 1.3 : 1.15));
+      if (G.reactMsg && !G.reactMsg.prec) { G.reactMsg.prec = true; emit(G, { t: 'text', p: target.idx, txt: pb ? 'MIRA AGUÇADA! +30%' : 'GOLPE PRECISO!', kind: 'good', crit: true }); } }
     if (d > 0 && attacker !== target && target.guardQ) {
-      const gq = target.guardQ, d0 = d; d = Math.round(d * (gq >= 2 ? 0.15 : 0.55)); G.reactPrev = (G.reactPrev || 0) + (d0 - d);
+      const gq = target.guardQ, d0 = d; d = Math.round(d * (gq >= 2 ? 0.45 : 0.75)); G.reactPrev = (G.reactPrev || 0) + (d0 - d);
       if (G.reactMsg && !G.reactMsg.guard) { G.reactMsg.guard = true; emit(G, { t: 'text', p: target.idx, txt: gq >= 2 ? 'GUARDA PERFEITA!' : 'GUARDA!', kind: 'block' });
-        if (gq >= 2 && !G.norage) target.rage = Math.min(100, (target.rage || 0) + 12); }
+        if (gq >= 2 && !G.norage) target.rage = Math.min(100, (target.rage || 0) + 6); }
     }
     if (d > 0 && hasRelic(target, 'ferro')) d = Math.max(0, d - 3);
     if (d > 0 && hasRelic(target, 'ultima') && !target.ultimaUsed && target.stats.life - d <= 0) { d = Math.max(0, target.stats.life - 1); target.ultimaUsed = true; emit(G, { t: 'text', p: target.idx, txt: 'ÚLTIMA CHANCE!', kind: 'good' }); }

@@ -121,6 +121,7 @@
           <label>Escolha<select id="rPick"><option value="free">Livre</option><option value="mirror">Espelho proibido</option><option value="draft">Draft (um escolhe depois do outro)</option></select></label>
           <label>Evento<select id="rMod"></select></label>
           <label>Clima<select id="rWx"></select></label>
+          <label>Vida (HP)<select id="rHp"></select></label>
           <label>Vida e cosmo<select id="rEpic"><option value="0">Normal</option><option value="1">Batalha Épica (+100 vida, +30 cosmo)</option></select></label>
           <label>Fúria<select id="rRage"><option value="1">Ligada</option><option value="0">Desligada (sem Cosmo Final)</option></select></label>
           <label>Equipe<select id="rTeam"><option value="1">Solo (1 cavaleiro)</option><option value="2">Dupla</option><option value="3">Trio</option></select></label>
@@ -209,7 +210,8 @@
     <div><b style="color:#9fe8ff">8º Sentido (Arayashiki)</b> — o sentido que permite manter a consciência, a individualidade e o controle do Cosmo ao cruzar a fronteira da morte e entrar no Inferno (Mundo dos Mortos) sem se submeter às leis de Hades. Por 3 turnos: remove seus efeitos negativos, fica imune a novos, ganha +8 de Força e Defesa, e sobrevive ao primeiro golpe fatal com 1 de vida (+25 de cosmo).</div>
     <div style="color:#aaa;font-size:14px">Cada poder pode ser usado uma vez por luta.</div></div>
     <div class="row"><button class="btn small" data-act="ultgo">Cosmo Final</button><button class="btn small" data-act="sensego">8º Sentido</button><button class="btn small ghost" data-act="close">Cancelar</button></div></div></div>
-  <div class="modal" id="mTeam"><div class="card-panel rgrid" style="min-width:560px;display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;color:var(--gold);font-size:26px">Opções de equipe</h3>
+  <div class="modal" id="mTeam"><div class="card-panel rgrid" style="min-width:560px;display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;color:var(--gold);font-size:26px">Opções da luta</h3>
+    <label>Vida (HP) dos dois<select id="tHp"></select></label>
     <label>Tamanho<select id="tTeam"><option value="1">Solo (1 cavaleiro)</option><option value="2">Dupla</option><option value="3">Trio</option></select></label>
     <label>Troca<select id="tSwap"><option value="free">Livre (1x por turno, 10 cosmo)</option><option value="gratis">Livre e grátis (1x por turno)</option><option value="fall">Só quando o cavaleiro cai</option></select></label>
     <label>Assistência na troca<select id="tAssist"><option value="1">Ligada (golpe ao entrar)</option><option value="0">Desligada</option></select></label>

@@ -235,7 +235,7 @@
     const c = CH[S.sel];
     let status = '';
     const tb = $('#select .teamsel'); tb.style.display = (S.mode === 'cpu' && S.selStep === 0 && !(S.myTeam || []).length) ? '' : 'none';
-    tb.textContent = '👥 Equipe: ' + ['', 'Solo', 'Dupla', 'Trio'][tSize()] + ' ⚙';
+    tb.textContent = '⚙ Luta: ' + ['', 'Solo', 'Dupla', 'Trio'][tSize()] + (soloT().hp ? ' · ' + soloT().hp + ' HP' : '');
     if (S.mode === 'cpu') status = S.selStep === 0 ? (tSize() > 1 ? 'Monte a equipe: cavaleiro ' + ((S.myTeam || []).length + 1) + ' de ' + tSize() + '. Combinações dão sinergia!' : 'Escolha o seu cavaleiro e toque em Avançar.') : 'Agora escolha o oponente (marcado em vermelho).';
     else if (online && S.rules && S.rules.pick === 'draft' && S.myPick == null && firstPicker() !== S.me && S.opPick == null) status = 'Draft: aguarde o outro jogador escolher primeiro…';
     else if (online) status = S.myPick != null ? (S.opPick != null ? 'Começando…' : 'Aguardando seu amigo escolher…') : (S.opPick != null ? 'Seu amigo já escolheu. Sua vez!' : 'Escolha seu cavaleiro.');
@@ -262,7 +262,7 @@
         renderSelect(); return;
       }
       const n = tSize() - 1, pool = order.filter(i => isUnl(i) && i !== 20 && i !== S.sel).sort(() => Math.random() - .5);
-      startLocal(S.myPick, S.sel, null, { mod: Mo.rollMod(0.7), wx: Mo.rollWx(0.4), t0: S.myTeam.slice(1), t1: pool.slice(0, n), tr: soloT() }); return;
+      startLocal(S.myPick, S.sel, null, { mod: Mo.rollMod(0.7), wx: Mo.rollWx(0.4), t0: S.myTeam.slice(1), t1: pool.slice(0, n), tr: soloT(), hp: soloT().hp }); return;
     }
     if (S.mode === 'torre') { S.myPick = S.sel; startTower(); return; }
     if (S.mode === 'weekly') { S.myPick = S.sel; startWeekly(); return; }
@@ -311,7 +311,7 @@
       if (Math.abs(dx) > 60) { S.santIdx = Math.max(0, Math.min(HOUSES.length - 1, S.santIdx + (dx < 0 ? 1 : -1))); Snd.play('sfx_card_out', .6); renderSant(); }
     });
   })();
-  function santFight(i) { S.santCur = i; startLocal(S.myPick, HOUSES[i][0], HOUSES[i][1], { wx: Mo.WX[i % Mo.WX.length].id }); }
+  function santFight(i) { S.santCur = i; startLocal(S.myPick, HOUSES[i][0], HOUSES[i][1], { hp: 500, b1: { life: i * 25 }, wx: Mo.WX[i % Mo.WX.length].id }); }
 
   // ---------- desbloqueio
   function showUnlocks(ids, done) {
@@ -393,7 +393,7 @@
   }
   function startWeekly() {
     const w = Mo.weekly(); S.wk = w;
-    startLocal(S.myPick, w.boss, 'Chefe da Semana', { mod: w.mod, wx: w.wx, b0: Mo.rankBonus(store.get('stars', 0)), b1: w.scale });
+    startLocal(S.myPick, w.boss, 'Chefe da Semana', { hp: 500, mod: w.mod, wx: w.wx, b0: Mo.rankBonus(store.get('stars', 0)), b1: w.scale });
   }
 
   // ---------- Torre (modo roguelike)
@@ -421,8 +421,8 @@
   }
   function towerFight() {
     const R = S.run, f = R.floor; modal('mTower', false);
-    const es = Mo.enemyScale(f); if (Mo.isBossFloor(f)) es.life += 40;
-    startLocal(R.char, R.enemy, 'Torre · Andar ' + f + (Mo.isBossFloor(f) ? ' · Chefe' : ''), { mod: R.mod, wx: Mo.rollWx(f >= 4 ? 0.45 : 0), b0: Object.assign(Mo.sumBless(R.bless, R.rank), { relics: R.relics.slice() }), b1: es });
+    const es = Mo.enemyScale(f); if (Mo.isBossFloor(f)) es.life += 120;
+    startLocal(R.char, R.enemy, 'Torre · Andar ' + f + (Mo.isBossFloor(f) ? ' · Chefe' : ''), { hp: 450, mod: R.mod, wx: Mo.rollWx(f >= 4 ? 0.45 : 0), b0: Object.assign(Mo.sumBless(R.bless, R.rank), { relics: R.relics.slice() }), b1: es });
   }
   function towerBless() {
     const R = S.run, rel = (R.floor - 1) % 3 === 0 && Mo.pickRelics(R.relics).length > 0;
@@ -472,14 +472,12 @@
   // ---------- reações por toque: Guarda Perfeita / Aparar / Contra-golpe (defesa) e Golpe Preciso (ataque)
   const rOn = k => store.get('react_' + k, true) !== false;
   function viewAtk(a) {
-    if (a.type === 'sig') return true;
-    if (a.type !== 'play') return false;
-    const P = S.view.p[S.me], h = P.hand.find(x => x.uid === a.uid), c = h && E.cardOf(P, h.ref); return !!(c && c.offensive);
+    if (a.type !== 'play') return false;   // cartas especiais e Golpe Assinatura não têm reação por toque
+    const P = S.view.p[S.me], h = P.hand.find(x => x.uid === a.uid), c = h && E.cardOf(P, h.ref); return !!(c && c.offensive && !c.special);
   }
   function isAtk(G, pi, a) {
-    if (a.type === 'sig') return true;
     if (a.type !== 'play') return false;
-    const p = G.p[pi], h = p.hand.find(x => x.uid === a.uid), c = h && E.cardOf(p, h.ref); return !!(c && c.offensive);
+    const p = G.p[pi], h = p.hand.find(x => x.uid === a.uid), c = h && E.cardOf(p, h.ref); return !!(c && c.offensive && !c.special);
   }
   function askRemote() {
     return new Promise(res => { const to = setTimeout(() => { S.askRes = null; res(0); }, 9000); S.askRes = q => { clearTimeout(to); S.askRes = null; res(q); }; S.link.send({ k: 'ask' }); });
@@ -554,22 +552,22 @@
       el.dataset.x = x; el.dataset.y = y;
       el.appendChild(mk('rg-lbl', x, y - 190, lbl));
       el.appendChild(mk('rg-arrow', x, y, AR[want]));
-      const t0 = performance.now(); let sx = 0, sy = 0, down = false; Snd.play('sfx_card_zoom', .6);
+      const t0 = performance.now(); let sx = 0, sy = 0, td = 0, down = false; Snd.play('sfx_card_zoom', .6);
       const judge = e => { if (!down) return; const [gx, gy] = toGame(e.clientX - sx, e.clientY - sy), len = Math.hypot(gx, gy);
-        if (len < 30 * scale) return; down = false; ripple(el, e, 'good');
-        const dir = Math.abs(gx) > Math.abs(gy) ? (gx > 0 ? 'right' : 'left') : (gy < 0 ? 'up' : 'down'), t = performance.now() - t0;
+        if (len < 22 * scale) return; down = false; ripple(el, e, 'good');
+        const dir = Math.abs(gx) > Math.abs(gy) ? (gx > 0 ? 'right' : 'left') : (gy < 0 ? 'up' : 'down'), t = performance.now() - td;   // duração do gesto (a partir do toque), não do aparecimento da seta
         if (dir !== want) return done(0, 'DIREÇÃO ERRADA', false, 'era ' + ({ up: 'para cima', left: 'para a esquerda', right: 'para a direita' })[want]);
-        if (t <= T * 0.6) done(2, 'PERFEITO!', true, 'deslize rápido'); else done(1, 'BOM!', true, 'um pouco lento'); };
-      el.onpointerdown = e => { down = true; sx = e.clientX; sy = e.clientY; }; el.onpointermove = judge; el.onpointerup = judge;
+        if (t <= 650) done(2, 'PERFEITO!', true, 'deslize rápido'); else done(1, 'BOM!', true, 'um pouco lento'); };
+      el.onpointerdown = e => { down = true; td = performance.now(); sx = e.clientX; sy = e.clientY; }; el.onpointermove = judge; el.onpointerup = judge;
       arm(T);
     });
   }
   async function mgGuard(pi, easy) {
     S.easy = !!easy;
     const swipe = Math.random() < 0.4; let q;
-    if (swipe) { const want = ['up', 'left', 'right'][Math.floor(Math.random() * 3)]; q = await mgSwipe(pi, want, S.easy ? 1300 : 900, 'APARE! Deslize na direção da seta'); }
+    if (swipe) { const want = ['up', 'left', 'right'][Math.floor(Math.random() * 3)]; q = await mgSwipe(pi, want, S.easy ? 1500 : 1100, 'APARE! Deslize na direção da seta'); }
     else q = await mgTap(pi);
-    if (q === 2) { const c = await mgSwipe(pi, 'up', 800, 'CONTRA-GOLPE! Deslize para cima'); if (c === 2 || c === 1) q = 3; }
+    if (q === 2) { const c = await mgSwipe(pi, 'up', 1000, 'CONTRA-GOLPE! Deslize para cima'); if (c === 2 || c === 1) q = 3; }
     return q;
   }
   function mgPrec(pi) {   // ponto fraco do oponente: toque nele para um golpe preciso
@@ -578,7 +576,7 @@
       el.dataset.x = cx; el.dataset.y = cy;
       el.appendChild(mk('rg-lbl', cx, cy - 190, 'GOLPE PRECISO! Toque no ponto fraco'));
       const w = mk('rg-weak', x, y); el.appendChild(w);
-      w.onpointerdown = e => { e.stopPropagation(); done(2, 'PRECISO!', true, '+25% de dano'); };
+      w.onpointerdown = e => { e.stopPropagation(); done(2, 'PRECISO!', true, '+15% de dano'); };
       el.onpointerdown = ev => { ripple(el, ev, 'miss'); done(0, 'ERROU O PONTO', false, 'dano normal'); };
       arm(T);
     });
@@ -1135,8 +1133,8 @@
     '37_ataques_opressivos': 'sfx_chute_cosmico', '38_afinidade_com_o_signo': 'sfx_afinidade_com_signo' };
 
   // ---------- regras da sala online
-  const DEF_RULES = { fmt: 'single', pick: 'free', mod: '', wx: '', epic: false, norage: false, filter: 'all', team: 1, swap: 'free', assist: true, syn: true, last: false };
-  const TDEF = { team: 1, swap: 'free', assist: true, syn: true, last: false };
+  const DEF_RULES = { hp: 0, fmt: 'single', pick: 'free', mod: '', wx: '', epic: false, norage: false, filter: 'all', team: 1, swap: 'free', assist: true, syn: true, last: false };
+  const TDEF = { hp: 0, team: 1, swap: 'free', assist: true, syn: true, last: false };
   const soloT = () => Object.assign({}, TDEF, store.get('teamRules', {}));
   const tSize = () => { if (onl()) { const r = S.rules || DEF_RULES; return r.fmt === 'tower' ? 1 : (r.team || 1); } return soloT().team; };
   const teamTxt = r => { const p = [{ 1: 'Solo', 2: 'Dupla', 3: 'Trio' }[r.team]]; p.push({ free: 'troca 10 cosmo', gratis: 'troca grátis', fall: 'troca só ao cair' }[r.swap]); if (!r.assist) p.push('sem assistência'); if (!r.syn) p.push('sem sinergias'); if (r.last) p.push('Último Cavaleiro'); return p.join(', '); };
@@ -1151,36 +1149,38 @@
     r = r || DEF_RULES; const p = [{ single: 'Luta única', bo3: 'Melhor de 3', tower: 'Torre a dois' }[r.fmt] || 'Luta única'];
     if (r.mod === 'random') p.push('Evento sorteado'); else if (r.mod) { const m = Mo.modById(r.mod); if (m) p.push('Evento: ' + m.name); }
     if (r.wx === 'random') p.push('Clima sorteado'); else if (r.wx) { const w = Mo.wxById(r.wx); if (w) p.push('Clima: ' + w.name); }
-    if (r.epic) p.push('Batalha Épica'); if (r.norage) p.push('Sem Fúria');
+    if (r.hp) p.push('Vida ' + r.hp); if (r.epic) p.push('Batalha Épica'); if (r.norage) p.push('Sem Fúria');
     if (r.filter === 'zod') p.push('Só Zodíacos'); if (r.filter === 'bronze') p.push('Só Bronzes');
     if (r.pick === 'mirror') p.push('Espelho proibido'); if (r.pick === 'draft') p.push('Draft');
     if ((r.team || 1) > 1 && r.fmt !== 'tower') p.push('Equipe: ' + teamTxt(r));
     return p.join(' · ');
   }
+  const hpOpts = '<option value="0">Padrão do personagem (250 a 400)</option>' + Array.from({ length: 59 }, (_, i) => 100 + i * 50).map(v => `<option value="${v}">${v} de vida</option>`).join('');
   function fillRuleSelects() {
+    $('#rHp').innerHTML = hpOpts; $('#tHp').innerHTML = hpOpts;
     $('#rMod').innerHTML = '<option value="">Nenhum</option><option value="random">Sorteado a cada luta</option>' + Mo.MODS.map(m => `<option value="${m.id}">${m.ic} ${esc(m.name)}</option>`).join('');
     $('#rWx').innerHTML = '<option value="">Nenhum</option><option value="random">Sorteado a cada luta</option>' + Mo.WX.map(w => `<option value="${w.id}">${w.ic} ${esc(w.name)}</option>`).join('');
   }
   function readRules() {
-    S.rules = { fmt: $('#rFmt').value, pick: $('#rPick').value, mod: $('#rMod').value, wx: $('#rWx').value, epic: $('#rEpic').value === '1', norage: $('#rRage').value === '0', filter: $('#rFilter').value,
+    S.rules = { hp: +$('#rHp').value, fmt: $('#rFmt').value, pick: $('#rPick').value, mod: $('#rMod').value, wx: $('#rWx').value, epic: $('#rEpic').value === '1', norage: $('#rRage').value === '0', filter: $('#rFilter').value,
       team: +$('#rTeam').value, swap: $('#rSwap').value, assist: $('#rAssist').value === '1', syn: $('#rSyn').value === '1', last: $('#rLast').value === '1' };
     $('#rSum').textContent = rulesText(S.rules);
   }
   function writeRules(r) {
-    $('#rFmt').value = r.fmt; $('#rPick').value = r.pick; $('#rMod').value = r.mod; $('#rWx').value = r.wx; $('#rEpic').value = r.epic ? '1' : '0'; $('#rRage').value = r.norage ? '0' : '1'; $('#rFilter').value = r.filter;
+    $('#rHp').value = String(r.hp || 0); $('#rFmt').value = r.fmt; $('#rPick').value = r.pick; $('#rMod').value = r.mod; $('#rWx').value = r.wx; $('#rEpic').value = r.epic ? '1' : '0'; $('#rRage').value = r.norage ? '0' : '1'; $('#rFilter').value = r.filter;
     $('#rTeam').value = r.team || 1; $('#rSwap').value = r.swap || 'free'; $('#rAssist').value = r.assist === false ? '0' : '1'; $('#rSyn').value = r.syn === false ? '0' : '1'; $('#rLast').value = r.last ? '1' : '0';
     readRules();
   }
   fillRuleSelects();
-  ['rFmt', 'rPick', 'rMod', 'rWx', 'rEpic', 'rRage', 'rFilter', 'rTeam', 'rSwap', 'rAssist', 'rSyn', 'rLast'].forEach(id => $('#' + id).addEventListener('change', readRules));
+  ['rHp', 'rFmt', 'rPick', 'rMod', 'rWx', 'rEpic', 'rRage', 'rFilter', 'rTeam', 'rSwap', 'rAssist', 'rSyn', 'rLast'].forEach(id => $('#' + id).addEventListener('change', readRules));
   function readSoloT() {
-    const t = { team: +$('#tTeam').value, swap: $('#tSwap').value, assist: $('#tAssist').value === '1', syn: $('#tSyn').value === '1', last: $('#tLast').value === '1' };
-    store.set('teamRules', t); $('#tSum').textContent = t.team > 1 ? 'Equipe: ' + teamTxt(t) : 'Sem equipe: você luta com um cavaleiro só.';
+    const t = { hp: +$('#tHp').value, team: +$('#tTeam').value, swap: $('#tSwap').value, assist: $('#tAssist').value === '1', syn: $('#tSyn').value === '1', last: $('#tLast').value === '1' };
+    store.set('teamRules', t); $('#tSum').textContent = (t.hp ? 'Vida de cada cavaleiro: ' + t.hp + '. ' : '') + (t.team > 1 ? 'Equipe: ' + teamTxt(t) : 'Sem equipe: você luta com um cavaleiro só.');
     if ($('#select').classList.contains('on')) renderSelect();
   }
-  ['tTeam', 'tSwap', 'tAssist', 'tSyn', 'tLast'].forEach(id => $('#' + id).addEventListener('change', readSoloT));
+  ['tHp', 'tTeam', 'tSwap', 'tAssist', 'tSyn', 'tLast'].forEach(id => $('#' + id).addEventListener('change', readSoloT));
   function openTeamOpts() {
-    const t = soloT(); $('#tTeam').value = t.team; $('#tSwap').value = t.swap; $('#tAssist').value = t.assist ? '1' : '0'; $('#tSyn').value = t.syn ? '1' : '0'; $('#tLast').value = t.last ? '1' : '0';
+    const t = soloT(); $('#tHp').value = String(t.hp || 0); $('#tTeam').value = t.team; $('#tSwap').value = t.swap; $('#tAssist').value = t.assist ? '1' : '0'; $('#tSyn').value = t.syn ? '1' : '0'; $('#tLast').value = t.last ? '1' : '0';
     readSoloT(); modal('mTeam');
   }
   // séries (melhor de 3) e escolhas
@@ -1265,7 +1265,7 @@
     const mt = S.myTeam && S.myTeam.length ? S.myTeam : [S.myPick], ot = S.opTeam || [S.opPick];
     if ((rl.pick === 'mirror' || rl.pick === 'draft') && mt.some(x => ot.includes(x))) { S.link.send({ k: 'clash' }); S.myPick = null; S.opPick = null; S.myTeam = []; S.opTeam = null; S.keepSent = false; openSelect(); toast('Os dois escolheram o mesmo cavaleiro. Escolham de novo!', 3000); return; }
     S.starting = true; S.me = 0;
-    const opts = { norage: rl.norage };
+    const opts = { norage: rl.norage, hp: rl.hp || 0 };
     if (rl.fmt !== 'tower' && (rl.team || 1) > 1) { opts.t0 = mt.slice(1); opts.t1 = ot.slice(1); opts.tr = { swap: rl.swap, assist: rl.assist, syn: rl.syn, last: rl.last }; }
     opts.mod = rl.mod === 'random' ? Mo.rollMod(1) : (rl.mod || null); opts.wx = rl.wx === 'random' ? Mo.rollWx(1) : (rl.wx || null);
     if (rl.epic) { opts.b0 = { life: 100, startCosmo: 30 }; opts.b1 = { life: 100, startCosmo: 30 }; }

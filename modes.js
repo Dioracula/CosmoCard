@@ -45,7 +45,7 @@ window.Modes = (function () {
   function weekly() {
     const idx = Math.floor((Date.now() / 86400000 + 3) / 7);
     return { key: 'W' + idx, boss: WBOSS[idx % WBOSS.length], mod: MODS[idx % MODS.length].id, wx: WX[(idx >> 1) % WX.length].id,
-      scale: { life: 130, att: 8, def: 6, cosmoRate: 0.3 }, reward: 10 };
+      scale: { life: 350, att: 8, def: 6, cosmoRate: 0.3 }, reward: 10 };
   }
 
   // ---------- bênçãos da Torre (o jogador escolhe 1 de 3 depois de cada vitória)
@@ -80,7 +80,7 @@ window.Modes = (function () {
     return b;
   };
   // inimigo da Torre: fica mais forte a cada andar
-  const enemyScale = f => ({ life: Math.round(14 * (f - 1)), att: Math.floor((f - 1) * 1.6), def: Math.floor((f - 1) * 1.2), cosmoRate: Math.min(0.6, 0.04 * (f - 1)) });
+  const enemyScale = f => ({ life: Math.round(35 * (f - 1)), att: Math.floor((f - 1) * 1.6), def: Math.floor((f - 1) * 1.2), cosmoRate: Math.min(0.6, 0.04 * (f - 1)) });
   const isBossFloor = f => f % 5 === 0;
   const towerMod = f => f <= 1 ? null : rollMod(f % 5 === 0 ? 0.9 : 0.65);
 

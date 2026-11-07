@@ -29,5 +29,5 @@
   mk({ n: 'Troca de Destino', d: 'Troca uma carta comum da sua mão por uma carta comum aleatória da mão do oponente. Não pega cartas especiais.', r: 3, s: '52_troca_de_destino', a: 'FateSwap', c: 25 });
   mk({ n: 'Vínculo de Cosmo', d: 'Cura 10 de vida por cada carta de ataque que você jogou neste turno.', r: 2, s: '53_vinculo_de_cosmo', a: 'CosmoBond', c: 25 });
   mk({ n: 'Reflexos Aguçados', d: 'Nos próximos 2 ataques do inimigo, o anel da guarda fica maior e mais fácil de acertar.', r: 2, s: '54_reflexos_agucados', a: 'SharpReflexes', c: 15, self: 1, deb: { easyGuard: 2, turnDuration: 3, debuffDescription: 'Guarda mais fácil nos próximos 2 ataques do inimigo.' } });
-  mk({ n: 'Mira Aguçada', d: 'O próximo Golpe Preciso causa +50% de dano em vez de +25%.', r: 2, s: '55_mira_agucada', a: 'SharpAim', c: 15, self: 1, deb: { precBoost: 1, turnDuration: 3, debuffDescription: 'Próximo Golpe Preciso: +50% de dano.' } });
+  mk({ n: 'Mira Aguçada', d: 'O próximo Golpe Preciso causa +30% de dano em vez de +15%.', r: 2, s: '55_mira_agucada', a: 'SharpAim', c: 15, self: 1, deb: { precBoost: 1, turnDuration: 3, debuffDescription: 'Próximo Golpe Preciso: +30% de dano.' } });
 })();
