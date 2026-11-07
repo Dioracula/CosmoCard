@@ -1,5 +1,5 @@
 // CosmoCards service worker: rede primeiro, cache como reserva (funciona offline e atualiza sozinho)
-const CACHE = 'cosmocards-v1';
+const CACHE = 'cosmocards-v2';
 const CORE = ['./', 'index.html', 'style.css', 'data.js', 'newcards.js', 'assets.js', 'sig.js', 'engine.js', 'net.js', 'fx.js', 'modes.js', 'ui.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => {
   self.skipWaiting();
