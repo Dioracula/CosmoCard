@@ -281,8 +281,9 @@
   // ---------- Santuário (carrossel das casas)
   function openSant(idx) {
     S.santIdx = idx != null ? idx : Math.min(santProgress(), HOUSES.length - 1);
-    show('sant'); Snd.music('character_selection_2'); renderSant();
+    show('sant'); Snd.music('character_selection_2'); S.ringIdx = -1; renderSant();
   }
+  const GOLD_BG = 'radial-gradient(circle at 42% 35%, #fff3b8 0%, #f2c24e 28%, #c98a1c 58%, #7a4a08 100%)';   // fundo dourado dos medalhões das casas
   function renderSant() {
     const car = $('#sant .carousel'); const prog = santProgress();
     if (!car.childElementCount) HOUSES.forEach(([id, name], i) => {
@@ -297,8 +298,9 @@
       h.classList.toggle('c', i === S.santIdx); h.classList.toggle('lock', lock);
       h.classList.toggle('done', i < prog); h.classList.toggle('open', !lock);
       h.style.display = Math.abs(i - S.santIdx) > 2 ? 'none' : '';
-      h.querySelector('.face').style.backgroundImage = lock ? 'none' : url('face_' + CH[id].key);
+      h.querySelector('.face').style.backgroundImage = lock ? GOLD_BG : url('face_' + CH[id].key) + ', ' + GOLD_BG;
     });
+    { const cur = $('.house.c', car); if (cur && S.ringIdx !== S.santIdx) { S.ringIdx = S.santIdx; cur.classList.remove('load'); void cur.offsetWidth; cur.classList.add('load'); } }   // anel carregando
     const [id, name] = HOUSES[S.santIdx], lock = S.santIdx > prog;
     $('#sant .santinfo').innerHTML = `${name}<small>${lock ? '??? — vença a casa anterior para chegar aqui' : (id === 20 && !isUnl(20) ? '???' : CH[id].title) + (S.santIdx < prog ? ' — casa conquistada (pode lutar de novo)' : ' — próxima batalha')}<br>Seu cavaleiro: ${CH[S.myPick].title} · ${prog} de ${HOUSES.length} casas</small>`;
     $('#sant [data-act=santgo]').disabled = lock;
@@ -678,6 +680,13 @@
     f.classList.toggle('c-on', k > 0.04); f.classList.toggle('c-max', k >= 0.995); f.classList.toggle('c-dark', auraKey(p, h.stance) === 'dark');
   }
   const stanceFx = () => {};
+  // +5 / -5 ao lado das bolas de Força e Defesa quando a postura muda
+  function pdPop(side, da, dd) {
+    const pd = $('#battle .pd.' + side); if (!pd) return;
+    [['att', da], ['def', dd]].forEach(([k, v]) => { v = Math.round(v || 0); if (!v) return;
+      const s = document.createElement('b'); s.className = 'pdpop ' + k + (v > 0 ? ' vup' : ' vdn'); s.textContent = (v > 0 ? '+' : '') + v;
+      pd.appendChild(s); setTimeout(() => s.remove(), 1900); });
+  }
   // ícones de postura (SVG, sem emoji): espada = ofensiva, escudo = defensiva
   const ST_SW = '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 38L36 12M30 10h8v8M14 30l8 8M8 40l4-4M38 38L12 12M10 10h8M10 10v8" stroke-width="3.5"/></svg>';
   const ST_SH = '<svg viewBox="0 0 48 48"><path d="M24 4l16 6v12c0 10-7 17-16 22C15 39 8 32 8 22V10z" fill="currentColor"/><path d="M24 10l10 4v8c0 6-4 11-10 15z" fill="rgba(255,255,255,.35)"/></svg>';
@@ -815,14 +824,14 @@
       }
       case 'discard': Snd.play('sfx_card_out', .7); if (me) renderHand(st); await wait(250); return;
       case 'cosmo': if (e.v > 0) { Snd.play('sfx_cosmo_recharge', .5); floatText(e.p, '+' + Math.round(e.v) + ' Cosmo', 'good', 60); } await wait(420); return;
-      case 'draw': if (me && !e.silent) Snd.play('sfx_card_flip', .7); if (me) renderHand(st); await wait(e.silent ? 0 : 200); return;
+      case 'draw': if (me && !e.silent) { Snd.play('sfx_card_flip', .7); const pt = $('#battle .hand .portal'); if (pt) { pt.classList.remove('pulse'); void pt.offsetWidth; pt.classList.add('pulse'); } } if (me) renderHand(st); await wait(e.silent ? 0 : 200); return;
       case 'stance': {
         if (me && e.s) track('stance');
         // revelação: chefe (CPU) sempre; jogador usando o Mestre só com o DEBUG ativo
         const first = !(S.mReveal && S.mReveal[e.p]);
         if (e.reveal || (first && e.s && store.get('debug', false) && st.p[e.p].charId === 20)) { (S.mReveal = S.mReveal || {})[e.p] = true; await mestreReveal(e.p, st); }
         else Snd.play('sfx_character_change');
-        } $('#battle .fighter.' + sideOf(e.p) + ' img').src = IMG[(e.s ? 'spr2_' : 'spr_') + CH[st.p[e.p].charId].key]; stanceFx(sideOf(e.p), e.s); floatText(e.p, ['Postura Neutra', 'Postura Ofensiva', 'Postura Defensiva'][e.s], 'good', -30); await wait(300); return;
+        } $('#battle .fighter.' + sideOf(e.p) + ' img').src = IMG[(e.s ? 'spr2_' : 'spr_') + CH[st.p[e.p].charId].key]; stanceFx(sideOf(e.p), e.s); floatText(e.p, ['Postura Neutra', 'Postura Ofensiva', 'Postura Defensiva'][e.s], 'good', -30); pdPop(sideOf(e.p), e.da, e.dd); await wait(300); return;
       case 'turn': {
         const mine = e.p === S.me;
         $$('#battle .fighter').forEach(f => f.classList.remove('turn')); fighterEl(e.p).classList.add('turn');
@@ -899,6 +908,10 @@
         if (b.dataset.k !== String(h.stance)) { b.dataset.k = h.stance; b.innerHTML = h.stance === 1 ? ST_SW : h.stance === 2 ? ST_SH : ''; } } }
       const pd = $('#battle .pd.' + side);
       pd.querySelector('.att').textContent = Math.round(h.att); pd.querySelector('.def').textContent = Math.round(h.def);
+      { const bs = h.base || st.p[pi].base || CH[st.p[pi].charId].stats, ba = bs.att != null ? bs.att : bs.attPower, bd = bs.def != null ? bs.def : bs.defPower;   // verde acima da base, vermelho abaixo
+        const ae = pd.querySelector('.att'), de = pd.querySelector('.def');
+        ae.classList.toggle('up', Math.round(h.att) > ba); ae.classList.toggle('down', Math.round(h.att) < ba);
+        de.classList.toggle('up', Math.round(h.def) > bd); de.classList.toggle('down', Math.round(h.def) < bd); }
     });
     const oph = $('#battle .ophand'); const n = hud[1 - S.me].hand;
     if (oph.childElementCount !== n) { oph.innerHTML = ''; for (let i = 0; i < n; i++) { const d = document.createElement('div'); d.style.backgroundImage = url('card_back'); oph.appendChild(d); } }
@@ -941,7 +954,7 @@
       el.querySelector('.effs').innerHTML = (good ? `<div class="eff" data-side="${side}" style='background-image:${url('ic_buff')}'><b>${good}</b></div>` : '') +
         (bad ? `<div class="eff" data-side="${side}" style='background-image:${url('ic_debuff')}'><b>${bad}</b></div>` : '');
     });
-    const hud = v.p.map(p => { const c = E.cur(p); return { life: p.stats.life, maxLife: p.stats.maxLife, cosmo: p.stats.cosmo, maxCosmo: p.stats.maxCosmo, att: c.attPower, def: c.defPower, stance: p.stance, hand: p.hand.length, rage: Math.round(p.rage || 0), ult: !!p.ultUsed, sense: !!p.senseUsed, senseOn: !!p.senseOn }; });
+    const hud = v.p.map(p => { const c = E.cur(p); return { life: p.stats.life, maxLife: p.stats.maxLife, cosmo: p.stats.cosmo, maxCosmo: p.stats.maxCosmo, att: c.attPower, def: c.defPower, base: p.base, stance: p.stance, hand: p.hand.length, rage: Math.round(p.rage || 0), ult: !!p.ultUsed, sense: !!p.senseUsed, senseOn: !!p.senseOn }; });
     renderHud(hud, v);
     renderBench(v);
     $$('#battle .fighter').forEach(f => f.classList.remove('turn'));
@@ -980,6 +993,8 @@
   function renderHand(v) {
     const P = v.p[S.me], hand = $('#battle .hand');
     const free = myFree();
+    { const ak = P.senseOn ? 'gold' : auraKey(P, P.stance), [ca, cb] = AURA[ak].split('|'); hand.style.setProperty('--ua', ca); hand.style.setProperty('--ub', cb); }
+    { const pt = hand.querySelector('.portal'); if (pt) pt.remove(); }
     const els = {}; $$('.card', hand).forEach(el => { els[el.dataset.uid] = el; });
     const n = P.hand.length, W = 118, avail = Math.min(980, SW - 520), x0 = (SW - avail) / 2;
     const step = n > 1 ? Math.min(W + 10, (avail - W) / (n - 1)) : 0;
@@ -992,14 +1007,14 @@
       if (!el) {
         el = document.createElement('div'); el.className = 'card new'; el.dataset.uid = h.uid;
         el.style.backgroundImage = 'url("' + cardImg(P.charId, h.ref) + '")';
-        el.innerHTML = '<div class="cost"></div><div class="dmg"></div>';
+        el.innerHTML = '<div class="ptl"></div><div class="cost"></div><div class="dmg"></div>';
         el.style.left = start + i * step + 'px'; el.style.top = '-34px';
         bindCard(el); hand.appendChild(el);
         setTimeout(() => el.classList.remove('new'), 500);
       }
       el.style.opacity = '';
       el.style.left = start + i * step + 'px'; el.style.top = '-34px'; el.style.zIndex = 10 + i;
-      el.querySelector('.cost').textContent = Math.round(E.costOf(P, card));
+      { const ce = el.querySelector('.cost'), cv = Math.round(E.costOf(P, card)); ce.textContent = cv; ce.classList.toggle('low', cv > Math.round(P.stats.cosmo)); }
       const est = E.estimate(v, P, card);
       el.querySelector('.dmg').textContent = est == null ? '' : est;
       const ok = E.isUsable(v, P, card);
@@ -1098,7 +1113,7 @@
     const P = v.p[S.me], c = CH[P.charId], can = myFree() && !P.stanceChanged;
     const opts = [[1, 'Ofensiva', c.off, 'Mais cartas de ataque'], [0, 'Neutra', null, 'Todas as cartas'], [2, 'Defensiva', c.deff, 'Mais cartas de defesa' + (c.id === 2 ? ' · Shun: mais chance de especial' : '')]];
     $('#mStance .stopts').innerHTML = opts.map(([s, n, b, t]) =>
-      `<button class="stopt ${P.stance === s ? 'on' : ''}" data-st="${s}" ${!can || P.stance === s ? 'disabled' : ''}><b>${n}</b><small>${b ? `Força ${sgn(b.attPower)} · Defesa ${sgn(b.defPower)}` : 'Sem bônus'}</small><small>${t}</small></button>`).join('');
+      `<button class="stopt ${P.stance === s ? 'on' : ''}" data-st="${s}" ${!can || P.stance === s ? 'disabled' : ''}><b>${n}</b><small>${b ? `Força <i class="${b.attPower >= 0 ? 'vup' : 'vdn'}">${sgn(b.attPower)}</i> · Defesa <i class="${b.defPower >= 0 ? 'vup' : 'vdn'}">${sgn(b.defPower)}</i>` : 'Sem bônus'}</small><small>${t}</small></button>`).join('');
     const auto = c.id === 20 && P.boss;
     if (auto) $('#mStance .stopts').querySelectorAll('button').forEach(b => { b.disabled = true; });
     $('#mStance .note').textContent = auto ? 'O Mestre (chefe) troca de postura sozinho, só depois de perder metade da vida, e nunca volta ao neutro.' : can ? 'Muda Força/Defesa e o tipo de carta que você mais recebe. Uma troca por turno.' : (P.stanceChanged ? 'Você já trocou de postura neste turno.' : 'Só dá para trocar no seu turno.');

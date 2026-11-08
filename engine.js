@@ -82,7 +82,7 @@
     return {
       idx, charId, stats, stance: 0, stanceChanged: false, hand: [], debuffs: [], invalid: [],
       specialProb: c.specialProb, specialInterval: SPECIAL_INTERVAL, specialCounter: SPECIAL_INTERVAL,
-      camusApplied: false, cosmoMult: 1, uq: {}, poison: null,
+      camusApplied: false, cosmoMult: 1, uq: {}, poison: null, base: { att: stats.attPower, def: stats.defPower },
     };
   }
 
@@ -116,7 +116,7 @@
     if ((has(0) || has(21)) && has(1) && has(3)) out.push({ name: 'Os Três Heróis', desc: 'Seiya, Shiryu e Hyoga: +3 Força, +3 Defesa e +10 Vida', b: { att: 3, def: 3, life: 10 } });
     return out;
   }
-  const REC = ['uq', 'poison', 'charId', 'stats', 'stance', 'stanceChanged', 'debuffs', 'invalid', 'specialProb', 'specialInterval', 'specialCounter', 'camusApplied', 'cosmoMult'];
+  const REC = ['base', 'uq', 'poison', 'charId', 'stats', 'stance', 'stanceChanged', 'debuffs', 'invalid', 'specialProb', 'specialInterval', 'specialCounter', 'camusApplied', 'cosmoMult'];
   function takeRec(p) { const r = {}; REC.forEach(k => { r[k] = p[k]; }); return r; }
   function putRec(p, r) { REC.forEach(k => { p[k] = r[k]; }); }
   function buildTeam(G, p, ids, syn) {
@@ -154,7 +154,7 @@
     return G.p.map(p => {
       const s = cur(p);
       return { life: p.stats.life, maxLife: p.stats.maxLife, cosmo: p.stats.cosmo, maxCosmo: p.stats.maxCosmo,
-        att: s.attPower, def: s.defPower, stance: p.stance, hand: p.hand.length, rage: Math.round(p.rage || 0), ult: !!p.ultUsed, sense: !!p.senseUsed, senseOn: !!p.senseOn, trap: !!p.trap, sig: sigInfo(p) };
+        att: s.attPower, def: s.defPower, base: p.base, stance: p.stance, hand: p.hand.length, rage: Math.round(p.rage || 0), ult: !!p.ultUsed, sense: !!p.senseUsed, senseOn: !!p.senseOn, trap: !!p.trap, sig: sigInfo(p) };
     });
   }
   function emit(G, e) { e.hud = hud(G); e.n = ++G.seq; G.ev.push(e); }
@@ -753,13 +753,13 @@
     return true;
   }
   function applyStance(G, p, s, extra) {
-    const pi = p.idx, c = charById[p.charId];
+    const pi = p.idx, c = charById[p.charId], a0 = p.stats.attPower, d0 = p.stats.defPower;
     if (p.stance === 1) { p.stats.attPower -= c.off.attPower; p.stats.defPower -= c.off.defPower; }
     if (p.stance === 2) { p.stats.attPower -= c.deff.attPower; p.stats.defPower -= c.deff.defPower; }
     p.stance = s;
     if (s === 1) { p.stats.attPower += c.off.attPower; p.stats.defPower += c.off.defPower; }
     if (s === 2) { p.stats.attPower += c.deff.attPower; p.stats.defPower += c.deff.defPower; }
-    emit(G, Object.assign({ t: 'stance', p: pi, s }, extra || {}));
+    emit(G, Object.assign({ t: 'stance', p: pi, s, da: p.stats.attPower - a0, dd: p.stats.defPower - d0 }, extra || {}));
   }
 
   // ------------------------------------------------------------------ passar turno (GameManager.PassTurn)

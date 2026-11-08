@@ -123,6 +123,15 @@ window.FX = (function () {
     for (let i = 0; i < 26; i++) add({ k: 'star4', x: at[0] + R(-110, 110), y: at[1] + R(40, 220), vy: R(-260, -120), w: R(10, 26), vr: R(-4, 4), life: R(0.6, 1.1), delay: R(0, 0.5), color });
   }
   function ring(k, at, s0, s1, life, color, o = {}) { add(Object.assign({ k, x: at[0], y: at[1], w: 300, s: s0, s1, life, color, fout: 0.6 }, o)); }
+  // explosão de cosmo no peito: clarão branco + feixes de luz em leque (como no jogo original)
+  function burst(A, col, d = 1) {
+    const C = [A[0], A[1] - 40];
+    glow(C, '#ffffff', 300, 0.55); glow(C, col, 460, 0.8, 0.05);
+    add({ k: 'star4', x: C[0], y: C[1], w: 260, life: 0.45, color: '#ffffff', fin: 0.05, fout: 0.7, s: 0.4, s1: 1.3 });
+    for (let i = 0; i < 7; i++) { const r = (-0.55 + i * 0.18) + (Math.random() - 0.5) * 0.12, L = 220 + Math.random() * 160;
+      add({ k: 'flareline', x: C[0] + d * Math.cos(r) * L / 2, y: C[1] + Math.sin(r) * L / 2, rot: d > 0 ? r : Math.PI - r, w: L, h: 26 + Math.random() * 18, life: 0.6, delay: i * 0.025, color: i % 2 ? col : '#e8ffff', whole: true, fin: 0.08, fout: 0.65 }); }
+    sparks(C, col, 14, 260);
+  }
   function sparks(at, color, n = 16, sp = 300) {
     for (let i = 0; i < n; i++) add({ k: 'glow', x: at[0], y: at[1], vx: R(-sp, sp), vy: R(-sp, sp), w: R(14, 30), life: R(0.3, 0.7), color });
   }
@@ -442,6 +451,7 @@ window.FX = (function () {
     }
     const df = C_DEF[sprite]; if (!df) return;
     const [t, col] = df;
+    burst(A, col, d);
     if (t === 'aura') aura(A, col, 1.0);
     else if (t === 'shield') { add({ k: 'shieldbr', frame: 0, x: A[0] + d * 120, y: A[1], w: 360, life: 0.9, color: col }); aura(A, col, 0.8); }
     else if (t === 'barrier') { ring('barrier', A, 0.7, 1.15, 1.1, col, { w: 440 }); glow(A, col, 340, 0.8); }
