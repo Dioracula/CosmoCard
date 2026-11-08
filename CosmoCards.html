@@ -574,6 +574,10 @@ button{font-family:inherit}
 .house.c.open.load img.on{animation:ringload 1.1s cubic-bezier(.4,0,.2,1) forwards}
 @keyframes ringload{from{--ring:0deg}to{--ring:360deg}}
 
+#netwarn{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:300;padding:8px 18px;border-radius:20px;background:rgba(120,20,10,.9);border:2px solid #ffb04a;color:#fff;font:700 15px system-ui;display:none;animation:nw 1s ease-in-out infinite}
+#netwarn.on{display:block}
+@keyframes nw{50%{opacity:.6}}
+
 </style>
 </head>
 <body>
@@ -790,6 +794,7 @@ button{font-family:inherit}
   <div class="modal" id="mOpt"><div class="card-panel" style="min-width:420px"><h3 style="margin:0;color:var(--gold);font-size:26px">Opções</h3>
     <button class="btn" data-act="mute" id="optMusic"></button><button class="btn" data-act="sfx" id="optSfx"></button><button class="btn" data-act="fs" id="optFs"></button>
     <button class="btn small ghost" data-act="close">Fechar</button></div></div>
+  <div id="netwarn">Conexão instável… reconectando</div>
   <div class="toast" id="toast"></div>
 </div></div>
 <script>
@@ -1019,6 +1024,7 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
 
   // PlayerManager.UpdateStats
   function updateStats(G, p, s, show) {
+    if (s.life > 0 && p.debuffs && p.debuffs.some(d => d.noHeal)) { s = Object.assign({}, s, { life: 0 }); if (show) emit(G, { t: 'text', p: p.idx, txt: 'Cura bloqueada!', kind: 'fail' }); }
     const st = p.stats;
     st.maxLife = Math.max(0, st.maxLife + (s.maxLife || 0));
     st.maxCosmo = Math.max(0, st.maxCosmo + (s.maxCosmo || 0));
@@ -1047,6 +1053,7 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
     if (G.over || G.turn !== p.idx) return false;
     if (isBoss(p) && card.special && !mestreHalf(p)) return false;
     if (tauntBlock(G, p, card)) return false;
+    if (card.offensive && p.debuffs.some(d => d.chained)) return false;   // Tempestade Nebulosa (Shun)
     const req = card.statsRequired;
     if (Math.round(p.stats.cosmo) < costOf(p, card)) return false;
     if (Math.max(0, p.stats.attPower) < req.attPower) return false;
@@ -1121,25 +1128,26 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
 
   // ------------------------------------------------------------------ Golpe Assinatura
   // Cada cavaleiro tem um golpe próprio que carrega com uma condição (atacar, apanhar, defender ou gastar cosmo).
+  // Golpe Assinatura: cada cavaleiro faz algo diferente com o inimigo (k = efeito especial)
   const SIG = {
-    seiya:    { n: 'Cometa de Pégaso',          t: 'atk',   g: 5, cost: 85, dmg: 70, d: 'Um único soco devastador: 70 de dano + Força.', fx: 'comet', c1: '#7fe4ff', c2: '#ffffff' },
+    seiya:    { n: 'Cometa de Pégaso',          t: 'atk',   g: 5, cost: 70, dmg: 80, k: 'pierce', d: 'Soco que atravessa a guarda: 80 de dano + Força, ignorando toda a Defesa do oponente.', fx: 'comet', c1: '#7fe4ff', c2: '#ffffff' },
     seiyacap: { alias: 'seiya' },
-    seiyasag: { n: 'Flecha de Ouro',            t: 'spent', g: 6, cost: 95, dmg: 85, heal: 10, d: '85 de dano + Força e cura 10 de vida.', fx: 'arrow', c1: '#ffe49a', c2: '#ffffff' },
-    shiryu:   { n: 'Cem Dragões de Rozan',      t: 'hit',   g: 5, cost: 75, dmg: 40, heal: 15, d: '40 de dano + Força e cura 15 de vida.', fx: 'dragons', c1: '#5dff9e', c2: '#d8ffe6' },
-    shun:     { n: 'Tempestade Nebulosa',       t: 'def',   g: 5, cost: 75, dmg: 50, sDef: 10, fDef: -10, d: '30 de dano, +10 de Defesa sua e -10 de Defesa do oponente (permanente).', fx: 'storm', c1: '#ff9ad8', c2: '#ffe0f4' },
-    hyoga:    { n: 'Trovão Aurora',             t: 'def',   g: 5, cost: 80, dmg: 45, noDraw: 1, d: '45 de dano; o oponente não saca carta no próximo turno.', fx: 'aurora', c1: '#9fe8ff', c2: '#ffffff' },
-    ikki:     { n: 'Golpe Fantasma Diabólico',  t: 'hit',   g: 5, cost: 80, dmg: 55, fAtt: -10, fCosmo: -20, d: '35 de dano, -10 de Força e -20 de cosmo do oponente.', fx: 'phantom', c1: '#ff7a2a', c2: '#b07cff' },
-    mu:       { n: 'Revolução Estelar',         t: 'def',   g: 5, cost: 75, dmg: 40, fDef: -15, d: '40 de dano e -15 de Defesa do oponente (permanente).', fx: 'stars', c1: '#ffe8a0', c2: '#ffffff' },
-    aldebaran:{ n: 'Nova do Titã',              t: 'hit',   g: 5, cost: 80, dmg: 75, d: 'Explosão de cosmo: 75 de dano + Força.', fx: 'nova', c1: '#ffcf70', c2: '#fff3c0' },
-    saga:     { n: 'Outra Dimensão',            t: 'spent', g: 6, cost: 85, dmg: 55, fCosmo: -40, d: '55 de dano e drena 40 de cosmo do oponente.', fx: 'portal', c1: '#b07cff', c2: '#6a2cff' },
-    deathmask:{ n: 'Fogo Fátuo das Almas',      t: 'atk',   g: 5, cost: 80, dot: [12, 4], dmg: 20, d: '20 de dano + 12 de dano por 4 turnos.', fx: 'souls', c1: '#9a7cff', c2: '#e0d0ff' },
-    shaka:    { n: 'Tesouro do Céu',            t: 'def',   g: 5, cost: 85, dmg: 55, fAtt: -10, fDef: -10, d: '55 de dano, -10 de Força e Defesa do oponente.', fx: 'lotus', c1: '#ffe9a0', c2: '#ffffff' },
-    miro:     { n: 'Restrição Escarlate',       t: 'atk',   g: 5, cost: 80, dmg: 50, dot: [10, 3], d: '30 de dano + 10 de dano por 3 turnos.', fx: 'needles', c1: '#ff3a4a', c2: '#ffd0d0' },
-    aioria:   { n: 'Rugido do Leão',            t: 'spent', g: 6, cost: 80, dmg: 65, sAtt: 5, d: '65 de dano + Força e +5 de Força permanente.', fx: 'lion', c1: '#ffe14a', c2: '#ffffff' },
-    shura:    { n: 'Lâmina do Capricórnio',     t: 'atk',   g: 5, cost: 80, dmg: 65, d: 'Corte sagrado: 65 de dano + Força.', fx: 'blade', c1: '#fff2a0', c2: '#ffffff' },
-    camus:    { n: 'Caixão de Gelo',            t: 'def',   g: 5, cost: 80, dmg: 40, noDraw: 1, fCosmo: -20, d: '40 de dano, -20 de cosmo e o oponente não saca carta no próximo turno.', fx: 'ice', c1: '#bff6ff', c2: '#ffffff' },
-    afrodite: { n: 'Rosa Piranha',              t: 'hit',   g: 5, cost: 75, dmg: 55, dot: [8, 4], d: '35 de dano + 8 de dano por 4 turnos.', fx: 'roses', c1: '#ff4060', c2: '#ffd0e0' },
-    aioros:   { n: 'Arco de Sagitário',         t: 'spent', g: 6, cost: 85, dmg: 80, d: 'Flecha celestial: 80 de dano + Força.', fx: 'arrow', c1: '#ffe08a', c2: '#fff3c0' },
+    seiyasag: { n: 'Flecha de Ouro',            t: 'spent', g: 6, cost: 95, dmg: 70, k: 'purge', d: '70 de dano + Força e destrói todos os efeitos positivos do oponente.', fx: 'arrow', c1: '#ffe49a', c2: '#ffffff' },
+    shiryu:   { n: 'Cem Dragões de Rozan',      t: 'hit',   g: 5, cost: 75, dmg: 13, hits: 4, d: 'Quatro dragões atingem o oponente: 4 golpes de 13 + Força.', fx: 'dragons', c1: '#5dff9e', c2: '#d8ffe6' },
+    shun:     { n: 'Tempestade Nebulosa',       t: 'def',   g: 5, cost: 70, dmg: 52, pierce: 1, k: 'chain', d: '52 de dano ignorando a Defesa e a corrente prende o oponente: ele não pode usar cartas de ataque no próximo turno.', fx: 'storm', c1: '#ff9ad8', c2: '#ffe0f4' },
+    hyoga:    { n: 'Trovão Aurora',             t: 'def',   g: 5, cost: 80, dmg: 40, noDraw: 1, d: '40 de dano e congela as mãos do oponente: ele não saca cartas no próximo turno.', fx: 'aurora', c1: '#9fe8ff', c2: '#ffffff' },
+    ikki:     { n: 'Golpe Fantasma Diabólico',  t: 'hit',   g: 5, cost: 80, dmg: 38, k: 'illusion', d: '38 de dano e a ilusão confunde o oponente: ele descarta 2 cartas da mão.', fx: 'phantom', c1: '#ff7a2a', c2: '#b07cff' },
+    mu:       { n: 'Revolução Estelar',         t: 'def',   g: 5, cost: 75, dmg: 30, fDef: -4, d: '30 de dano e quebra a armadura: -4 de Defesa do oponente (permanente).', fx: 'stars', c1: '#ffe8a0', c2: '#ffffff' },
+    aldebaran:{ n: 'Nova do Titã',              t: 'hit',   g: 5, cost: 80, dmg: 60, k: 'stagger', d: '60 de dano + Força; o impacto derruba a postura do oponente (volta a Neutra) e tira 25 de cosmo.', fx: 'nova', c1: '#ffcf70', c2: '#fff3c0' },
+    saga:     { n: 'Outra Dimensão',            t: 'spent', g: 5, cost: 85, dmg: 75, k: 'void', d: '75 de dano e lança metade do cosmo do oponente em outra dimensão, de onde Saga o absorve.', fx: 'portal', c1: '#b07cff', c2: '#6a2cff' },
+    deathmask:{ n: 'Fogo Fátuo das Almas',      t: 'atk',   g: 5, cost: 80, dot: [16, 4], dmg: 35, d: '35 de dano e queima a alma: 16 de dano por 4 turnos.', fx: 'souls', c1: '#9a7cff', c2: '#e0d0ff' },
+    shaka:    { n: 'Tesouro do Céu',            t: 'def',   g: 5, cost: 85, dmg: 44, fAtt: -6, fDef: -6, d: '44 de dano e tira os sentidos: -6 de Força e -6 de Defesa do oponente (permanente).', fx: 'lotus', c1: '#ffe9a0', c2: '#ffffff' },
+    miro:     { n: 'Restrição Escarlate',       t: 'atk',   g: 5, cost: 80, dmg: 55, k: 'needles', nd: 7, d: '55 de dano e crava 7 Agulhas Escarlates no oponente (Antares com 15).', fx: 'needles', c1: '#ff3a4a', c2: '#ffd0d0' },
+    aioria:   { n: 'Rugido do Leão',            t: 'spent', g: 6, cost: 80, dmg: 65, k: 'paralyze', d: '65 de dano + Força e o plasma paralisa: -15 de Força do oponente no próximo turno dele.', fx: 'lion', c1: '#ffe14a', c2: '#ffffff' },
+    shura:    { n: 'Lâmina do Capricórnio',     t: 'atk',   g: 4, cost: 65, dmg: 70, k: 'sunder', d: '70 de dano + Força e Excalibur corta a armadura: a Defesa do oponente cai pela metade (permanente).', fx: 'blade', c1: '#fff2a0', c2: '#ffffff' },
+    camus:    { n: 'Caixão de Gelo',            t: 'def',   g: 5, cost: 80, dmg: 35, k: 'freeze', d: '35 de dano e prende o oponente no gelo: ele não gera cosmo no próximo turno.', fx: 'ice', c1: '#bff6ff', c2: '#ffffff' },
+    afrodite: { n: 'Rosa Piranha',              t: 'hit',   g: 5, cost: 75, dmg: 60, heal: 15, k: 'noheal', d: '60 de dano, Afrodite recupera 15 de Vida e as rosas envenenam o sangue: o oponente não pode se curar por 3 rodadas.', fx: 'roses', c1: '#ff4060', c2: '#ffd0e0' },
+    aioros:   { n: 'Arco de Sagitário',         t: 'spent', g: 6, cost: 85, dmg: 50, k: 'steal', st: 4, d: '50 de dano + Força e a flecha rouba o poder: tira 4 de Força do oponente e dá a você (permanente).', fx: 'arrow', c1: '#ffe08a', c2: '#fff3c0' },
   };
   const TRIG_TXT = { atk: 'ataques', hit: 'golpes sofridos', def: 'cartas de defesa', spent: 'cosmo gasto' };
   function sigDef(p) { const k = charById[p.charId].key; let s = SIG[k]; if (s && s.alias) s = SIG[s.alias]; return s || null; }
@@ -1156,7 +1164,10 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
     const st = sigSt(p); st.prog = 0; st.uses++;
     updateStats(G, p, { cosmo: -s.cost }, false);
     emit(G, { t: 'sig', p: pi, charId: p.charId, title: s.n, fx: s.fx, c1: s.c1, c2: s.c2 });
-    if (s.dmg) dealDamage(G, t, p, { life: -s.dmg }, false);
+    const immune = () => { if (t.senseOn) { emit(G, { t: 'text', p: t.idx, txt: 'IMUNE às leis de Hades', kind: 'block' }); return true; } return false; };
+    if (s.hits) { for (let i = 0; i < s.hits && !G.over && t.stats.life > 0; i++) dealDamage(G, t, p, { life: -s.dmg }, false); }
+    else if (s.k === 'pierce' || s.pierce) dealDamage(G, t, p, { life: -(s.dmg + Math.max(0, cur(t).defPower)) }, false);   // ignora a Defesa
+    else if (s.dmg) dealDamage(G, t, p, { life: -s.dmg }, false);
     if (!G.over) {
       if (s.heal) updateStats(G, p, { life: s.heal }, true);
       if (s.sDef || s.sAtt) updateStats(G, p, { defPower: s.sDef || 0, attPower: s.sAtt || 0 }, true);
@@ -1172,6 +1183,32 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
             t.debuffs.push(mkDebuff({ debuffName: s.n, negativeDebuff: 1, isEndTurnDebuff: 1, isStaticStatsChangerDebuff: 1, turnDuration: s.dot[1], debuffStatsChange: z, debuffDescription: s.dot[0] + ' de dano por ' + s.dot[1] + ' turnos.' })); }
           emit(G, { t: 'debuff', p: t.idx, name: s.n, good: false });
         }
+      }
+      const zero = () => ({ life: 0, maxLife: 0, cosmo: 0, maxCosmo: 0, attPower: 0, defPower: 0, cosmoGainedPerTurn: 0, cosmoMultiplierPerTurn: 0 });
+      const deb = (o) => { t.debuffs.push(mkDebuff(Object.assign({ negativeDebuff: 1, isPassivePersistentDebuff: 1 }, o))); emit(G, { t: 'debuff', p: t.idx, name: o.debuffName, good: false }); };
+      switch (s.k) {
+        case 'purge': {
+          const n0 = t.debuffs.length; t.debuffs = t.debuffs.filter(d => d.negativeDebuff || d.aplicateAntares);
+          emit(G, { t: 'text', p: t.idx, txt: n0 > t.debuffs.length ? 'EFEITOS POSITIVOS DESTRUÍDOS!' : 'Nenhum efeito para destruir', kind: 'fail' }); break; }
+        case 'chain': if (!immune()) deb({ debuffName: 'Acorrentado', chained: 1, turnDuration: 2, debuffDescription: 'Não pode usar cartas de ataque neste turno.' }); break;
+        case 'illusion': {
+          if (immune()) break;
+          let n = 0; for (let i = 0; i < 2 && t.hand.length; i++) { t.hand.splice(rint(0, t.hand.length - 1), 1); n++; }
+          emit(G, { t: 'text', p: t.idx, txt: n ? 'ILUSÃO! Descartou ' + n + ' carta' + (n > 1 ? 's' : '') : 'Mão vazia', kind: 'fail' });
+          emit(G, { t: 'discard', p: t.idx }); emit(G, { t: 'draw', p: t.idx, v: 0, silent: true }); break; }
+        case 'stagger':
+          if (t.stance && !isBoss(t) && !t.senseOn) { applyStance(G, t, 0); emit(G, { t: 'text', p: t.idx, txt: 'POSTURA QUEBRADA!', kind: 'fail' }); }
+          updateStats(G, t, { cosmo: -25 }, true); break;
+        case 'void': { const c = Math.floor(t.stats.cosmo / 2); emit(G, { t: 'text', p: t.idx, txt: 'COSMO EXILADO!', kind: 'fail' }); if (c > 0) { updateStats(G, t, { cosmo: -c }, true); updateStats(G, p, { cosmo: c }, true); } break; }
+        case 'needles': {
+          if (immune()) break;
+          const sp = charById[ID.MIRO].special, dbf = clone(sp.debuff); dbf.antaresAplication = s.nd || 5; dbf.negativeDebuff = 1;
+          addDebuff(G, t, { debuff: dbf, cardType: 0, tittle: 'Agulha Escarlate' }); break; }
+        case 'paralyze': if (!immune()) { const z = zero(); z.attPower = -15; deb({ debuffName: 'Paralisia de Plasma', isStaticStatsChangerDebuff: 1, debuffStatsChange: z, turnDuration: 2, debuffDescription: '-15 de Força neste turno.' }); } break;
+        case 'sunder': if (!immune()) { const h = Math.floor(t.stats.defPower / 2); emit(G, { t: 'text', p: t.idx, txt: 'ARMADURA CORTADA!', kind: 'fail' }); if (h > 0) updateStats(G, t, { defPower: -h }, true); } break;
+        case 'freeze': if (!immune()) deb({ debuffName: 'Caixão de Gelo', isCancelCosmoGeneration: 1, turnDuration: 1, debuffDescription: 'Não gera cosmo no próximo turno.' }); break;
+        case 'noheal': if (!immune()) deb({ debuffName: 'Sangue Envenenado', noHeal: 1, turnDuration: 6, debuffDescription: 'Não pode recuperar vida.' }); break;
+        case 'steal': if (!immune()) { const v = Math.min(s.st || 4, t.stats.attPower); if (v > 0) { updateStats(G, t, { attPower: -v }, true); updateStats(G, p, { attPower: v }, true); emit(G, { t: 'text', p: p.idx, txt: 'PODER ROUBADO! +' + v + ' Força', kind: 'good' }); } } break;
       }
     }
     checkOver(G);
@@ -1864,7 +1901,9 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
 </script>
 <script>
 /* Conexão online entre amigos: WebRTC ponto a ponto via PeerJS (código de sala).
-   ?net=bc usa BroadcastChannel (teste local entre abas). */
+   ?net=bc usa BroadcastChannel (teste local entre abas).
+   Resistente a quedas: batimento (ping) a cada 2 s, reconexão automática por até 45 s e
+   erros do servidor de salas não derrubam uma partida já conectada. */
 (function () {
   const PREFIX = 'cosmocards-v1-';
   const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -1873,6 +1912,7 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
   const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' }] };
   const useBC = /[?&]net=bc/.test(location.search);
+  const HB_MS = 2000, STALE_MS = 10000, RECONN_MS = 45000;
 
   function code() { let s = ''; for (let i = 0; i < 5; i++) s += ALPH[Math.floor(Math.random() * ALPH.length)]; return s; }
 
@@ -1893,26 +1933,80 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
   }
 
   class Link {
-    constructor(h) { this.h = h; this.peer = null; this.conn = null; this.bc = null; this.closed = false; }
-    _wire(conn) {
-      this.conn = conn;
-      conn.on('open', () => this.h.open && this.h.open());
-      conn.on('data', d => this.h.data && this.h.data(d));
-      conn.on('close', () => this._lost());
-      conn.on('error', () => this._lost());
+    constructor(h) {
+      this.h = h; this.peer = null; this.conn = null; this.bc = null; this.closed = false;
+      this.everOpen = false; this.reconn = false; this.lastRx = Date.now(); this.hb = null; this.rt = null; this.dl = null;
+      this._vis = () => { if (document.visibilityState === 'visible') { this.lastRx = Date.now(); if (this.everOpen && !this.closed) { if (!this.conn || !this.conn.open) this._drop(); else this.h.wake && this.h.wake(); } } };
+      document.addEventListener('visibilitychange', this._vis);
     }
-    _lost() { if (this.closed) return; this.closed = true; this.h.close && this.h.close(); }
+    _wire(conn) {
+      conn.on('open', () => {
+        if (this.closed) { try { conn.close(); } catch (e) {} return; }
+        if (this.conn && this.conn !== conn) { const old = this.conn; this.conn = conn; try { old.close(); } catch (e) {} } else this.conn = conn;
+        this.lastRx = Date.now(); this._startHb();
+        if (!this.everOpen) { this.everOpen = true; this.h.open && this.h.open(); }
+        else if (this.reconn) { this.reconn = false; clearTimeout(this.rt); clearTimeout(this.dl); this.h.unstable && this.h.unstable(false); this.h.reopen && this.h.reopen(); }
+      });
+      conn.on('data', d => {
+        if (conn !== this.conn) return;
+        this.lastRx = Date.now();
+        if (d && d.__hb) return;
+        this.h.data && this.h.data(d);
+      });
+      conn.on('close', () => { if (conn === this.conn) this._drop(); });
+      conn.on('error', () => { if (conn === this.conn) this._drop(); });
+      if (!this.conn) this.conn = conn;
+    }
+    _startHb() {
+      if (this.hb) return;
+      this.hb = setInterval(() => {
+        if (this.closed) return;
+        if (this.conn && this.conn.open) { try { this.conn.send({ __hb: 1 }); } catch (e) {} }
+        if (this.everOpen && !this.reconn && document.visibilityState === 'visible' && Date.now() - this.lastRx > STALE_MS) this._drop();
+      }, HB_MS);
+    }
+    // conexão caiu ou ficou muda: tenta reconectar antes de desistir
+    _drop() {
+      if (this.closed || this.reconn) return;
+      if (!this.everOpen) return this._lost();
+      this.reconn = true; this.h.unstable && this.h.unstable(true);
+      clearTimeout(this.dl); this.dl = setTimeout(() => { if (this.reconn) this._lost(); }, RECONN_MS);
+      if (this.role === 'guest') this._retry();
+      else if (this.peer && this.peer.disconnected && !this.peer.destroyed) { try { this.peer.reconnect(); } catch (e) {} }
+    }
+    _retry() {
+      if (this.closed || !this.reconn) return;
+      const p = this.peer;
+      try {
+        if (p && p.destroyed) { this._newGuestPeer(); }
+        else if (p && p.disconnected) p.reconnect();
+        else if (p && p.open) { const c = p.connect(PREFIX + this.code, { reliable: true, serialization: 'json' }); this._wire(c); }
+      } catch (e) {}
+      clearTimeout(this.rt); this.rt = setTimeout(() => this._retry(), 4000);
+    }
+    _newGuestPeer() {
+      const peer = this.peer = new Peer(undefined, { debug: 0, config: ICE });
+      peer.on('open', () => { if (this.reconn) { const c = peer.connect(PREFIX + this.code, { reliable: true, serialization: 'json' }); this._wire(c); } });
+      peer.on('error', () => {});
+      peer.on('disconnected', () => { if (!this.closed && !peer.destroyed) try { peer.reconnect(); } catch (e) {} });
+    }
+    _lost() {
+      if (this.closed) return;
+      this.closed = true; clearInterval(this.hb); clearTimeout(this.rt); clearTimeout(this.dl);
+      document.removeEventListener('visibilitychange', this._vis);
+      this.h.close && this.h.close();
+    }
     send(o) {
       if (this.bc) { this.bc.postMessage({ from: this.role, o }); return; }
-      if (this.conn && this.conn.open) this.conn.send(o);
+      if (this.conn && this.conn.open) { try { this.conn.send(o); } catch (e) { this._drop(); } }
     }
     async host() {
       this.role = 'host';
       if (useBC) {
-        const c = code(); this.h.code && this.h.code(c);
+        const c = code(); this.code = c; this.h.code && this.h.code(c);
         this.bc = new BroadcastChannel(PREFIX + c);
         this.bc.onmessage = e => { const m = e.data; if (m.from === 'host') return;
-          if (m.o === '__hello') { this.bc.postMessage({ from: 'host', o: '__welcome' }); this.h.open && this.h.open(); return; }
+          if (m.o === '__hello') { this.bc.postMessage({ from: 'host', o: '__welcome' }); if (!this.everOpen) { this.everOpen = true; this.h.open && this.h.open(); } else this.h.reopen && this.h.reopen(); return; }
           if (m.o === '__bye') return this._lost(); this.h.data && this.h.data(m.o); };
         return;
       }
@@ -1920,43 +2014,46 @@ window.SIGIMG={"frame_blue": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAVAA
       const tryId = (left) => {
         const c = code();
         const peer = this.peer = new Peer(PREFIX + c, { debug: 0, config: ICE });
-        peer.on('open', () => this.h.code && this.h.code(c));
+        peer.on('open', () => { if (!this.everOpen) { this.code = c; this.h.code && this.h.code(c); } });
         peer.on('connection', conn => {
-          if (this.conn) { conn.on('open', () => conn.close()); return; }
+          // aceita a reconexão do amigo se a conexão atual caiu; recusa um terceiro jogador
+          if (this.conn && this.conn.open && !this.reconn && this.everOpen && Date.now() - this.lastRx < 4000) { conn.on('open', () => conn.close()); return; }
           this._wire(conn);
         });
         peer.on('error', err => {
-          if (err.type === 'unavailable-id' && left > 0) { peer.destroy(); tryId(left - 1); return; }
+          if (err.type === 'unavailable-id' && left > 0 && !this.everOpen) { peer.destroy(); tryId(left - 1); return; }
+          if (this.everOpen) return;   // partida em andamento: erro do servidor de salas não derruba a conexão direta
           this.h.error && this.h.error(err.type || 'erro');
         });
-        peer.on('disconnected', () => { if (!this.closed && this.peer && !this.peer.destroyed) try { this.peer.reconnect(); } catch (e) {} });
+        peer.on('disconnected', () => { if (!this.closed && this.peer && !this.peer.destroyed) setTimeout(() => { try { if (this.peer.disconnected && !this.peer.destroyed) this.peer.reconnect(); } catch (e) {} }, 1500); });
       };
       tryId(3);
     }
     async join(c) {
       this.role = 'guest';
-      c = c.toUpperCase().trim();
+      c = c.toUpperCase().trim(); this.code = c;
       if (useBC) {
         this.bc = new BroadcastChannel(PREFIX + c);
         this.bc.onmessage = e => { const m = e.data; if (m.from === 'guest') return;
-          if (m.o === '__welcome') { this.h.open && this.h.open(); return; }
+          if (m.o === '__welcome') { if (!this.everOpen) { this.everOpen = true; this.h.open && this.h.open(); } return; }
           if (m.o === '__bye') return this._lost(); this.h.data && this.h.data(m.o); };
         this.bc.postMessage({ from: 'guest', o: '__hello' });
         return;
       }
       await loadPeer();
       const peer = this.peer = new Peer(undefined, { debug: 0, config: ICE });
-      let opened = false;
       peer.on('open', () => {
+        if (this.everOpen) return;
         const conn = peer.connect(PREFIX + c, { reliable: true, serialization: 'json' });
-        conn.on('open', () => { opened = true; });
         this._wire(conn);
-        setTimeout(() => { if (!opened && !this.closed) this.h.error && this.h.error('timeout'); }, 15000);
+        setTimeout(() => { if (!this.everOpen && !this.closed) this.h.error && this.h.error('timeout'); }, 15000);
       });
-      peer.on('error', err => this.h.error && this.h.error(err.type || 'erro'));
+      peer.on('error', err => { if (this.everOpen) return; this.h.error && this.h.error(err.type || 'erro'); });
+      peer.on('disconnected', () => { if (!this.closed && !peer.destroyed) setTimeout(() => { try { if (peer.disconnected && !peer.destroyed) peer.reconnect(); } catch (e) {} }, 1500); });
     }
     close() {
-      this.closed = true;
+      this.closed = true; clearInterval(this.hb); clearTimeout(this.rt); clearTimeout(this.dl);
+      document.removeEventListener('visibilitychange', this._vis);
       try { if (this.bc) { this.bc.postMessage({ from: this.role, o: '__bye' }); this.bc.close(); } } catch (e) {}
       try { this.conn && this.conn.close(); } catch (e) {}
       try { this.peer && this.peer.destroy(); } catch (e) {}
@@ -3093,7 +3190,11 @@ window.Modes = (function () {
       if (S.pending) return;
       (async () => {
         if (viewAtk(a) && rOn('prec')) { S.busyR = true; renderControls(); try { a.prec = await mgPrec(1 - S.me); } catch (e) {} S.busyR = false; }
-        S.pending = true; S.link.send({ k: 'act', a }); renderControls();
+        a.n = S.actN = (S.actN || 0) + 1;
+        S.pending = true; S.link && S.link.send({ k: 'act', a }); renderControls();
+        clearTimeout(S.pendT); let tries = 0;
+        const again = () => { if (!S.pending || S.mode !== 'guest' || !S.link || ++tries > 6) return; S.link.send({ k: 'act', a }); S.pendT = setTimeout(again, 6000); };
+        S.pendT = setTimeout(again, 6000);
       })(); return;
     }
     applyR(S.me, a);
@@ -3237,7 +3338,8 @@ window.Modes = (function () {
         const e = ev[i], nx = ev[i + 1];
         // avisos/efeitos que vêm logo antes do dano não seguram o golpe: aparecem junto com ele
         const pre = nx && nx.t === 'dmg' && nx.v > 0 && (e.t === 'passive' || e.t === 'stat' || e.t === 'debuff' || e.t === 'needles' || (e.t === 'text' && e.kind !== 'counter' && e.txt !== 'GRANDE CHIFRE!'));
-        try { if (pre) { anim(e, st).catch(err => console.error(err)); await wait(60); } else await anim(e, st); } catch (err) { console.error(err); }
+        S.curEv = e.t + (e.txt ? ':' + e.txt : '');
+        try { if (pre) { anim(e, st).catch(err => console.error(err)); await wait(60); } else await Promise.race([anim(e, st), wait(7000)]); } catch (err) { console.error(err); }   // uma animação travada nunca congela a partida
       }
       S.view = st; render();
     }
@@ -3901,7 +4003,10 @@ window.Modes = (function () {
         if (S.rules && S.mode === 'host') toast('Regras: ' + rulesText(S.rules), 3500);
       },
       data: onNet,
-      close: () => {
+      unstable: on => { const el = $('#netwarn'); if (el) el.classList.toggle('on', !!on); if (!on) toast('Conexão restabelecida!', 2000); },
+      reopen: () => { if (S.mode === 'guest' && S.link) S.link.send({ k: 'sync' }); },
+      wake: () => { if (S.mode === 'guest' && S.link && (S.pending || S.view)) S.link.send({ k: 'sync' }); },
+      close: () => { { const el = $('#netwarn'); if (el) el.classList.remove('on'); }
         if (S.race) { S.race.fr.gone = true; S.race.fr.dead = true; S.link = null; toast('Seu amigo saiu da partida.'); updRace(); if (S.race.waiting) raceResult(); return; }
         if (S.mode === 'host' || S.mode === 'guest') { S.link = null; S.left = true; leftRoom(); } },
       error: t => {
@@ -3912,6 +4017,10 @@ window.Modes = (function () {
         $('#onChoice').style.display = 'flex'; $('#onWait').style.display = 'none'; $('#onRules').style.display = 'none';
       },
     };
+  }
+  function sendSync() {   // estado completo da partida para o convidado (após queda ou mensagem perdida)
+    if (!S.link) return;
+    if (S.G) S.link.send({ k: 'upd', ev: [], st: snap(S.G), sync: 1 });
   }
   function onNet(m) {
     if (!m || !m.k) return;
@@ -3924,7 +4033,11 @@ window.Modes = (function () {
       if (!$('#battle').classList.contains('on')) { S.queue.push({ ev: m.ev, st: m.st }); return; }
       deliver(m.ev, m.st);
     }
-    else if (m.k === 'act' && S.mode === 'host' && S.G) { applyR(1, m.a); }
+    else if (m.k === 'act' && S.mode === 'host' && S.G) {
+      const n = m.a && m.a.n;   // jogada reenviada (mensagem perdida): não aplica duas vezes, só reenvia o estado
+      if (n && n <= (S.lastActN || 0)) { sendSync(); return; }
+      if (n) S.lastActN = n; applyR(1, m.a); }
+    else if (m.k === 'sync' && S.mode === 'host') sendSync();
     else if (m.k === 'ask' && S.mode === 'guest') { (async () => { let q = 0; if (rOn('guard')) { S.busyR = true; try { q = await mgGuard(S.me, !!(S.view && S.view.p[S.me].debuffs.some(x => x.easyGuard))); } catch (e) {} S.busyR = false; } S.link.send({ k: 'ares', q }); })(); }
     else if (m.k === 'ares' && S.mode === 'host' && S.askRes) { S.askRes(m.q | 0); }
     else if (m.k === 'again') {

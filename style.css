@@ -555,3 +555,7 @@ button{font-family:inherit}
 .house img.on{-webkit-mask:conic-gradient(from 0deg at 48.2% 48.7%,#000 var(--ring),transparent 0);mask:conic-gradient(from 0deg at 48.2% 48.7%,#000 var(--ring),transparent 0)}
 .house.c.open.load img.on{animation:ringload 1.1s cubic-bezier(.4,0,.2,1) forwards}
 @keyframes ringload{from{--ring:0deg}to{--ring:360deg}}
+
+#netwarn{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:300;padding:8px 18px;border-radius:20px;background:rgba(120,20,10,.9);border:2px solid #ffb04a;color:#fff;font:700 15px system-ui;display:none;animation:nw 1s ease-in-out infinite}
+#netwarn.on{display:block}
+@keyframes nw{50%{opacity:.6}}

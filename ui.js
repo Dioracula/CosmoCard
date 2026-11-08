@@ -466,7 +466,11 @@
       if (S.pending) return;
       (async () => {
         if (viewAtk(a) && rOn('prec')) { S.busyR = true; renderControls(); try { a.prec = await mgPrec(1 - S.me); } catch (e) {} S.busyR = false; }
-        S.pending = true; S.link.send({ k: 'act', a }); renderControls();
+        a.n = S.actN = (S.actN || 0) + 1;
+        S.pending = true; S.link && S.link.send({ k: 'act', a }); renderControls();
+        clearTimeout(S.pendT); let tries = 0;
+        const again = () => { if (!S.pending || S.mode !== 'guest' || !S.link || ++tries > 6) return; S.link.send({ k: 'act', a }); S.pendT = setTimeout(again, 6000); };
+        S.pendT = setTimeout(again, 6000);
       })(); return;
     }
     applyR(S.me, a);
@@ -610,7 +614,8 @@
         const e = ev[i], nx = ev[i + 1];
         // avisos/efeitos que vêm logo antes do dano não seguram o golpe: aparecem junto com ele
         const pre = nx && nx.t === 'dmg' && nx.v > 0 && (e.t === 'passive' || e.t === 'stat' || e.t === 'debuff' || e.t === 'needles' || (e.t === 'text' && e.kind !== 'counter' && e.txt !== 'GRANDE CHIFRE!'));
-        try { if (pre) { anim(e, st).catch(err => console.error(err)); await wait(60); } else await anim(e, st); } catch (err) { console.error(err); }
+        S.curEv = e.t + (e.txt ? ':' + e.txt : '');
+        try { if (pre) { anim(e, st).catch(err => console.error(err)); await wait(60); } else await Promise.race([anim(e, st), wait(7000)]); } catch (err) { console.error(err); }   // uma animação travada nunca congela a partida
       }
       S.view = st; render();
     }
@@ -1274,7 +1279,10 @@
         if (S.rules && S.mode === 'host') toast('Regras: ' + rulesText(S.rules), 3500);
       },
       data: onNet,
-      close: () => {
+      unstable: on => { const el = $('#netwarn'); if (el) el.classList.toggle('on', !!on); if (!on) toast('Conexão restabelecida!', 2000); },
+      reopen: () => { if (S.mode === 'guest' && S.link) S.link.send({ k: 'sync' }); },
+      wake: () => { if (S.mode === 'guest' && S.link && (S.pending || S.view)) S.link.send({ k: 'sync' }); },
+      close: () => { { const el = $('#netwarn'); if (el) el.classList.remove('on'); }
         if (S.race) { S.race.fr.gone = true; S.race.fr.dead = true; S.link = null; toast('Seu amigo saiu da partida.'); updRace(); if (S.race.waiting) raceResult(); return; }
         if (S.mode === 'host' || S.mode === 'guest') { S.link = null; S.left = true; leftRoom(); } },
       error: t => {
@@ -1285,6 +1293,10 @@
         $('#onChoice').style.display = 'flex'; $('#onWait').style.display = 'none'; $('#onRules').style.display = 'none';
       },
     };
+  }
+  function sendSync() {   // estado completo da partida para o convidado (após queda ou mensagem perdida)
+    if (!S.link) return;
+    if (S.G) S.link.send({ k: 'upd', ev: [], st: snap(S.G), sync: 1 });
   }
   function onNet(m) {
     if (!m || !m.k) return;
@@ -1297,7 +1309,11 @@
       if (!$('#battle').classList.contains('on')) { S.queue.push({ ev: m.ev, st: m.st }); return; }
       deliver(m.ev, m.st);
     }
-    else if (m.k === 'act' && S.mode === 'host' && S.G) { applyR(1, m.a); }
+    else if (m.k === 'act' && S.mode === 'host' && S.G) {
+      const n = m.a && m.a.n;   // jogada reenviada (mensagem perdida): não aplica duas vezes, só reenvia o estado
+      if (n && n <= (S.lastActN || 0)) { sendSync(); return; }
+      if (n) S.lastActN = n; applyR(1, m.a); }
+    else if (m.k === 'sync' && S.mode === 'host') sendSync();
     else if (m.k === 'ask' && S.mode === 'guest') { (async () => { let q = 0; if (rOn('guard')) { S.busyR = true; try { q = await mgGuard(S.me, !!(S.view && S.view.p[S.me].debuffs.some(x => x.easyGuard))); } catch (e) {} S.busyR = false; } S.link.send({ k: 'ares', q }); })(); }
     else if (m.k === 'ares' && S.mode === 'host' && S.askRes) { S.askRes(m.q | 0); }
     else if (m.k === 'again') {

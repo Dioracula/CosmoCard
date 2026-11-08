@@ -177,6 +177,7 @@
 
   // PlayerManager.UpdateStats
   function updateStats(G, p, s, show) {
+    if (s.life > 0 && p.debuffs && p.debuffs.some(d => d.noHeal)) { s = Object.assign({}, s, { life: 0 }); if (show) emit(G, { t: 'text', p: p.idx, txt: 'Cura bloqueada!', kind: 'fail' }); }
     const st = p.stats;
     st.maxLife = Math.max(0, st.maxLife + (s.maxLife || 0));
     st.maxCosmo = Math.max(0, st.maxCosmo + (s.maxCosmo || 0));
@@ -205,6 +206,7 @@
     if (G.over || G.turn !== p.idx) return false;
     if (isBoss(p) && card.special && !mestreHalf(p)) return false;
     if (tauntBlock(G, p, card)) return false;
+    if (card.offensive && p.debuffs.some(d => d.chained)) return false;   // Tempestade Nebulosa (Shun)
     const req = card.statsRequired;
     if (Math.round(p.stats.cosmo) < costOf(p, card)) return false;
     if (Math.max(0, p.stats.attPower) < req.attPower) return false;
@@ -279,25 +281,26 @@
 
   // ------------------------------------------------------------------ Golpe Assinatura
   // Cada cavaleiro tem um golpe próprio que carrega com uma condição (atacar, apanhar, defender ou gastar cosmo).
+  // Golpe Assinatura: cada cavaleiro faz algo diferente com o inimigo (k = efeito especial)
   const SIG = {
-    seiya:    { n: 'Cometa de Pégaso',          t: 'atk',   g: 5, cost: 85, dmg: 70, d: 'Um único soco devastador: 70 de dano + Força.', fx: 'comet', c1: '#7fe4ff', c2: '#ffffff' },
+    seiya:    { n: 'Cometa de Pégaso',          t: 'atk',   g: 5, cost: 70, dmg: 80, k: 'pierce', d: 'Soco que atravessa a guarda: 80 de dano + Força, ignorando toda a Defesa do oponente.', fx: 'comet', c1: '#7fe4ff', c2: '#ffffff' },
     seiyacap: { alias: 'seiya' },
-    seiyasag: { n: 'Flecha de Ouro',            t: 'spent', g: 6, cost: 95, dmg: 85, heal: 10, d: '85 de dano + Força e cura 10 de vida.', fx: 'arrow', c1: '#ffe49a', c2: '#ffffff' },
-    shiryu:   { n: 'Cem Dragões de Rozan',      t: 'hit',   g: 5, cost: 75, dmg: 40, heal: 15, d: '40 de dano + Força e cura 15 de vida.', fx: 'dragons', c1: '#5dff9e', c2: '#d8ffe6' },
-    shun:     { n: 'Tempestade Nebulosa',       t: 'def',   g: 5, cost: 75, dmg: 50, sDef: 10, fDef: -10, d: '30 de dano, +10 de Defesa sua e -10 de Defesa do oponente (permanente).', fx: 'storm', c1: '#ff9ad8', c2: '#ffe0f4' },
-    hyoga:    { n: 'Trovão Aurora',             t: 'def',   g: 5, cost: 80, dmg: 45, noDraw: 1, d: '45 de dano; o oponente não saca carta no próximo turno.', fx: 'aurora', c1: '#9fe8ff', c2: '#ffffff' },
-    ikki:     { n: 'Golpe Fantasma Diabólico',  t: 'hit',   g: 5, cost: 80, dmg: 55, fAtt: -10, fCosmo: -20, d: '35 de dano, -10 de Força e -20 de cosmo do oponente.', fx: 'phantom', c1: '#ff7a2a', c2: '#b07cff' },
-    mu:       { n: 'Revolução Estelar',         t: 'def',   g: 5, cost: 75, dmg: 40, fDef: -15, d: '40 de dano e -15 de Defesa do oponente (permanente).', fx: 'stars', c1: '#ffe8a0', c2: '#ffffff' },
-    aldebaran:{ n: 'Nova do Titã',              t: 'hit',   g: 5, cost: 80, dmg: 75, d: 'Explosão de cosmo: 75 de dano + Força.', fx: 'nova', c1: '#ffcf70', c2: '#fff3c0' },
-    saga:     { n: 'Outra Dimensão',            t: 'spent', g: 6, cost: 85, dmg: 55, fCosmo: -40, d: '55 de dano e drena 40 de cosmo do oponente.', fx: 'portal', c1: '#b07cff', c2: '#6a2cff' },
-    deathmask:{ n: 'Fogo Fátuo das Almas',      t: 'atk',   g: 5, cost: 80, dot: [12, 4], dmg: 20, d: '20 de dano + 12 de dano por 4 turnos.', fx: 'souls', c1: '#9a7cff', c2: '#e0d0ff' },
-    shaka:    { n: 'Tesouro do Céu',            t: 'def',   g: 5, cost: 85, dmg: 55, fAtt: -10, fDef: -10, d: '55 de dano, -10 de Força e Defesa do oponente.', fx: 'lotus', c1: '#ffe9a0', c2: '#ffffff' },
-    miro:     { n: 'Restrição Escarlate',       t: 'atk',   g: 5, cost: 80, dmg: 50, dot: [10, 3], d: '30 de dano + 10 de dano por 3 turnos.', fx: 'needles', c1: '#ff3a4a', c2: '#ffd0d0' },
-    aioria:   { n: 'Rugido do Leão',            t: 'spent', g: 6, cost: 80, dmg: 65, sAtt: 5, d: '65 de dano + Força e +5 de Força permanente.', fx: 'lion', c1: '#ffe14a', c2: '#ffffff' },
-    shura:    { n: 'Lâmina do Capricórnio',     t: 'atk',   g: 5, cost: 80, dmg: 65, d: 'Corte sagrado: 65 de dano + Força.', fx: 'blade', c1: '#fff2a0', c2: '#ffffff' },
-    camus:    { n: 'Caixão de Gelo',            t: 'def',   g: 5, cost: 80, dmg: 40, noDraw: 1, fCosmo: -20, d: '40 de dano, -20 de cosmo e o oponente não saca carta no próximo turno.', fx: 'ice', c1: '#bff6ff', c2: '#ffffff' },
-    afrodite: { n: 'Rosa Piranha',              t: 'hit',   g: 5, cost: 75, dmg: 55, dot: [8, 4], d: '35 de dano + 8 de dano por 4 turnos.', fx: 'roses', c1: '#ff4060', c2: '#ffd0e0' },
-    aioros:   { n: 'Arco de Sagitário',         t: 'spent', g: 6, cost: 85, dmg: 80, d: 'Flecha celestial: 80 de dano + Força.', fx: 'arrow', c1: '#ffe08a', c2: '#fff3c0' },
+    seiyasag: { n: 'Flecha de Ouro',            t: 'spent', g: 6, cost: 95, dmg: 70, k: 'purge', d: '70 de dano + Força e destrói todos os efeitos positivos do oponente.', fx: 'arrow', c1: '#ffe49a', c2: '#ffffff' },
+    shiryu:   { n: 'Cem Dragões de Rozan',      t: 'hit',   g: 5, cost: 75, dmg: 13, hits: 4, d: 'Quatro dragões atingem o oponente: 4 golpes de 13 + Força.', fx: 'dragons', c1: '#5dff9e', c2: '#d8ffe6' },
+    shun:     { n: 'Tempestade Nebulosa',       t: 'def',   g: 5, cost: 70, dmg: 52, pierce: 1, k: 'chain', d: '52 de dano ignorando a Defesa e a corrente prende o oponente: ele não pode usar cartas de ataque no próximo turno.', fx: 'storm', c1: '#ff9ad8', c2: '#ffe0f4' },
+    hyoga:    { n: 'Trovão Aurora',             t: 'def',   g: 5, cost: 80, dmg: 40, noDraw: 1, d: '40 de dano e congela as mãos do oponente: ele não saca cartas no próximo turno.', fx: 'aurora', c1: '#9fe8ff', c2: '#ffffff' },
+    ikki:     { n: 'Golpe Fantasma Diabólico',  t: 'hit',   g: 5, cost: 80, dmg: 38, k: 'illusion', d: '38 de dano e a ilusão confunde o oponente: ele descarta 2 cartas da mão.', fx: 'phantom', c1: '#ff7a2a', c2: '#b07cff' },
+    mu:       { n: 'Revolução Estelar',         t: 'def',   g: 5, cost: 75, dmg: 30, fDef: -4, d: '30 de dano e quebra a armadura: -4 de Defesa do oponente (permanente).', fx: 'stars', c1: '#ffe8a0', c2: '#ffffff' },
+    aldebaran:{ n: 'Nova do Titã',              t: 'hit',   g: 5, cost: 80, dmg: 60, k: 'stagger', d: '60 de dano + Força; o impacto derruba a postura do oponente (volta a Neutra) e tira 25 de cosmo.', fx: 'nova', c1: '#ffcf70', c2: '#fff3c0' },
+    saga:     { n: 'Outra Dimensão',            t: 'spent', g: 5, cost: 85, dmg: 75, k: 'void', d: '75 de dano e lança metade do cosmo do oponente em outra dimensão, de onde Saga o absorve.', fx: 'portal', c1: '#b07cff', c2: '#6a2cff' },
+    deathmask:{ n: 'Fogo Fátuo das Almas',      t: 'atk',   g: 5, cost: 80, dot: [16, 4], dmg: 35, d: '35 de dano e queima a alma: 16 de dano por 4 turnos.', fx: 'souls', c1: '#9a7cff', c2: '#e0d0ff' },
+    shaka:    { n: 'Tesouro do Céu',            t: 'def',   g: 5, cost: 85, dmg: 44, fAtt: -6, fDef: -6, d: '44 de dano e tira os sentidos: -6 de Força e -6 de Defesa do oponente (permanente).', fx: 'lotus', c1: '#ffe9a0', c2: '#ffffff' },
+    miro:     { n: 'Restrição Escarlate',       t: 'atk',   g: 5, cost: 80, dmg: 55, k: 'needles', nd: 7, d: '55 de dano e crava 7 Agulhas Escarlates no oponente (Antares com 15).', fx: 'needles', c1: '#ff3a4a', c2: '#ffd0d0' },
+    aioria:   { n: 'Rugido do Leão',            t: 'spent', g: 6, cost: 80, dmg: 65, k: 'paralyze', d: '65 de dano + Força e o plasma paralisa: -15 de Força do oponente no próximo turno dele.', fx: 'lion', c1: '#ffe14a', c2: '#ffffff' },
+    shura:    { n: 'Lâmina do Capricórnio',     t: 'atk',   g: 4, cost: 65, dmg: 70, k: 'sunder', d: '70 de dano + Força e Excalibur corta a armadura: a Defesa do oponente cai pela metade (permanente).', fx: 'blade', c1: '#fff2a0', c2: '#ffffff' },
+    camus:    { n: 'Caixão de Gelo',            t: 'def',   g: 5, cost: 80, dmg: 35, k: 'freeze', d: '35 de dano e prende o oponente no gelo: ele não gera cosmo no próximo turno.', fx: 'ice', c1: '#bff6ff', c2: '#ffffff' },
+    afrodite: { n: 'Rosa Piranha',              t: 'hit',   g: 5, cost: 75, dmg: 60, heal: 15, k: 'noheal', d: '60 de dano, Afrodite recupera 15 de Vida e as rosas envenenam o sangue: o oponente não pode se curar por 3 rodadas.', fx: 'roses', c1: '#ff4060', c2: '#ffd0e0' },
+    aioros:   { n: 'Arco de Sagitário',         t: 'spent', g: 6, cost: 85, dmg: 50, k: 'steal', st: 4, d: '50 de dano + Força e a flecha rouba o poder: tira 4 de Força do oponente e dá a você (permanente).', fx: 'arrow', c1: '#ffe08a', c2: '#fff3c0' },
   };
   const TRIG_TXT = { atk: 'ataques', hit: 'golpes sofridos', def: 'cartas de defesa', spent: 'cosmo gasto' };
   function sigDef(p) { const k = charById[p.charId].key; let s = SIG[k]; if (s && s.alias) s = SIG[s.alias]; return s || null; }
@@ -314,7 +317,10 @@
     const st = sigSt(p); st.prog = 0; st.uses++;
     updateStats(G, p, { cosmo: -s.cost }, false);
     emit(G, { t: 'sig', p: pi, charId: p.charId, title: s.n, fx: s.fx, c1: s.c1, c2: s.c2 });
-    if (s.dmg) dealDamage(G, t, p, { life: -s.dmg }, false);
+    const immune = () => { if (t.senseOn) { emit(G, { t: 'text', p: t.idx, txt: 'IMUNE às leis de Hades', kind: 'block' }); return true; } return false; };
+    if (s.hits) { for (let i = 0; i < s.hits && !G.over && t.stats.life > 0; i++) dealDamage(G, t, p, { life: -s.dmg }, false); }
+    else if (s.k === 'pierce' || s.pierce) dealDamage(G, t, p, { life: -(s.dmg + Math.max(0, cur(t).defPower)) }, false);   // ignora a Defesa
+    else if (s.dmg) dealDamage(G, t, p, { life: -s.dmg }, false);
     if (!G.over) {
       if (s.heal) updateStats(G, p, { life: s.heal }, true);
       if (s.sDef || s.sAtt) updateStats(G, p, { defPower: s.sDef || 0, attPower: s.sAtt || 0 }, true);
@@ -330,6 +336,32 @@
             t.debuffs.push(mkDebuff({ debuffName: s.n, negativeDebuff: 1, isEndTurnDebuff: 1, isStaticStatsChangerDebuff: 1, turnDuration: s.dot[1], debuffStatsChange: z, debuffDescription: s.dot[0] + ' de dano por ' + s.dot[1] + ' turnos.' })); }
           emit(G, { t: 'debuff', p: t.idx, name: s.n, good: false });
         }
+      }
+      const zero = () => ({ life: 0, maxLife: 0, cosmo: 0, maxCosmo: 0, attPower: 0, defPower: 0, cosmoGainedPerTurn: 0, cosmoMultiplierPerTurn: 0 });
+      const deb = (o) => { t.debuffs.push(mkDebuff(Object.assign({ negativeDebuff: 1, isPassivePersistentDebuff: 1 }, o))); emit(G, { t: 'debuff', p: t.idx, name: o.debuffName, good: false }); };
+      switch (s.k) {
+        case 'purge': {
+          const n0 = t.debuffs.length; t.debuffs = t.debuffs.filter(d => d.negativeDebuff || d.aplicateAntares);
+          emit(G, { t: 'text', p: t.idx, txt: n0 > t.debuffs.length ? 'EFEITOS POSITIVOS DESTRUÍDOS!' : 'Nenhum efeito para destruir', kind: 'fail' }); break; }
+        case 'chain': if (!immune()) deb({ debuffName: 'Acorrentado', chained: 1, turnDuration: 2, debuffDescription: 'Não pode usar cartas de ataque neste turno.' }); break;
+        case 'illusion': {
+          if (immune()) break;
+          let n = 0; for (let i = 0; i < 2 && t.hand.length; i++) { t.hand.splice(rint(0, t.hand.length - 1), 1); n++; }
+          emit(G, { t: 'text', p: t.idx, txt: n ? 'ILUSÃO! Descartou ' + n + ' carta' + (n > 1 ? 's' : '') : 'Mão vazia', kind: 'fail' });
+          emit(G, { t: 'discard', p: t.idx }); emit(G, { t: 'draw', p: t.idx, v: 0, silent: true }); break; }
+        case 'stagger':
+          if (t.stance && !isBoss(t) && !t.senseOn) { applyStance(G, t, 0); emit(G, { t: 'text', p: t.idx, txt: 'POSTURA QUEBRADA!', kind: 'fail' }); }
+          updateStats(G, t, { cosmo: -25 }, true); break;
+        case 'void': { const c = Math.floor(t.stats.cosmo / 2); emit(G, { t: 'text', p: t.idx, txt: 'COSMO EXILADO!', kind: 'fail' }); if (c > 0) { updateStats(G, t, { cosmo: -c }, true); updateStats(G, p, { cosmo: c }, true); } break; }
+        case 'needles': {
+          if (immune()) break;
+          const sp = charById[ID.MIRO].special, dbf = clone(sp.debuff); dbf.antaresAplication = s.nd || 5; dbf.negativeDebuff = 1;
+          addDebuff(G, t, { debuff: dbf, cardType: 0, tittle: 'Agulha Escarlate' }); break; }
+        case 'paralyze': if (!immune()) { const z = zero(); z.attPower = -15; deb({ debuffName: 'Paralisia de Plasma', isStaticStatsChangerDebuff: 1, debuffStatsChange: z, turnDuration: 2, debuffDescription: '-15 de Força neste turno.' }); } break;
+        case 'sunder': if (!immune()) { const h = Math.floor(t.stats.defPower / 2); emit(G, { t: 'text', p: t.idx, txt: 'ARMADURA CORTADA!', kind: 'fail' }); if (h > 0) updateStats(G, t, { defPower: -h }, true); } break;
+        case 'freeze': if (!immune()) deb({ debuffName: 'Caixão de Gelo', isCancelCosmoGeneration: 1, turnDuration: 1, debuffDescription: 'Não gera cosmo no próximo turno.' }); break;
+        case 'noheal': if (!immune()) deb({ debuffName: 'Sangue Envenenado', noHeal: 1, turnDuration: 6, debuffDescription: 'Não pode recuperar vida.' }); break;
+        case 'steal': if (!immune()) { const v = Math.min(s.st || 4, t.stats.attPower); if (v > 0) { updateStats(G, t, { attPower: -v }, true); updateStats(G, p, { attPower: v }, true); emit(G, { t: 'text', p: p.idx, txt: 'PODER ROUBADO! +' + v + ' Força', kind: 'good' }); } } break;
       }
     }
     checkOver(G);
