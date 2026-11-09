@@ -5,7 +5,7 @@ window.FX = (function () {
   const imgs = {}, tintCache = {};
   const SHEETS = { impact6: [4, 4, 16], hitice: [4, 4, 16], firehit: [4, 4, 16], core01: [4, 4, 16], core03: [4, 4, 16], proj03: [4, 4, 16],
     proj07: [4, 4, 16], lightsub: [4, 4, 16], icesmoke: [4, 4, 16], dust: [4, 4, 16], wind05: [4, 4, 16], spark1: [4, 4, 16],
-    elec: [7, 1, 7], fireball: [2, 1, 2], shieldbr: [2, 1, 2], flare02: [4, 2, 8], dragonsheet: [4, 2, 8] };
+    elec: [7, 1, 7], solesmoke: [8, 1, 8], fireripple: [4, 4, 16], dustc: [2, 2, 4], fireball: [2, 1, 2], shieldbr: [2, 1, 2], flare02: [4, 2, 8], dragonsheet: [4, 2, 8] };
   const R = (a, b) => a + Math.random() * (b - a);
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -132,6 +132,26 @@ window.FX = (function () {
       add({ k: 'flareline', x: C[0] + d * Math.cos(r) * L / 2, y: C[1] + Math.sin(r) * L / 2, rot: d > 0 ? r : Math.PI - r, w: L, h: 26 + Math.random() * 18, life: 0.6, delay: i * 0.025, color: i % 2 ? col : '#e8ffff', whole: true, fin: 0.08, fout: 0.65 }); }
     sparks(C, col, 14, 260);
   }
+  // ---- efeitos extras tirados das texturas do jogo original
+  function puff(at, n = 3) {   // poeira no chão (SoleSmoke)
+    for (let i = 0; i < n; i++) add({ k: 'solesmoke', x: at[0] + R(-70, 70), y: at[1] + R(-8, 8), w: R(110, 170), life: 0.55, fps: 15, vx: R(-60, 60), vy: R(-30, -10), a: 0.75, delay: i * 0.05, blend: 'lighter', color: '#d9c7a8' });
+  }
+  function lens(at, col) { add({ k: 'dustc', frame: Math.floor(R(0, 4)), x: at[0], y: at[1] - 30, w: 260, life: 0.5, s: 0.5, s1: 1.4, color: col || null, fin: 0.05, fout: 0.6 }); }
+  function fireRipple(at, s = 1) { add({ k: 'fireripple', x: at[0], y: at[1], w: 420 * s, life: 0.7, fps: 24 }); }
+  function iceBurst(at, n = 9) {
+    for (let i = 0; i < n; i++) { const a = R(0, 6.28), v = R(200, 420);
+      add({ k: 'icebulk', x: at[0], y: at[1], w: R(30, 70), life: 0.8, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 80, ay: 500, vr: R(-8, 8), rot: R(0, 6), blend: 'source-over', fout: 0.4 }); }
+  }
+  function ghosts(A, B, n = 6, col) {
+    for (let i = 0; i < n; i++) { const e = [B[0] + R(-60, 60), B[1] + R(-110, 60)];
+      setTimeout(() => proj('ghost', [A[0] + R(-40, 40), A[1] + R(-80, 40)], e, R(0.45, 0.65), { w: R(60, 100), color: col || '#cbb6ff', rot: 0, fin: 0.1, fout: 0.2 }), i * 90); }
+  }
+  function speedLines(at, col) { for (let i = 0; i < 2; i++) add({ k: 'speed', x: at[0] + (i ? 90 : -90), y: at[1], w: 260, life: 0.45, vy: -260, color: col || null, a: 0.8, delay: i * 0.06 }); }
+  function bubble(at, col) { add({ k: 'bubble', x: at[0], y: at[1], w: 380, life: 0.9, s: 0.5, s1: 1.05, color: col || '#9fe8ff', fin: 0.1, fout: 0.5 }); }
+  function magicCircle(at, col, life = 1.4) { add({ k: 'circle01', x: at[0], y: at[1] + 250, w: 420, h: 130, life, vr: 0, color: col || null, a: 0.9, fin: 0.15, fout: 0.4 }); }
+  function fairy(at, col, n = 14) { for (let i = 0; i < n; i++) add({ k: 'fairy', x: at[0] + R(-90, 90), y: at[1] + R(-40, 140), w: R(24, 48), life: R(0.8, 1.3), vy: R(-140, -60), color: col || null, delay: R(0, 0.3) }); }
+  function rays(at, col, s = 1) { add({ k: 'aurarays', x: at[0], y: at[1], w: 380 * s, life: 0.7, s: 0.4, s1: 1.2, vr: 1.2, color: col || null, fin: 0.05, fout: 0.6 }); }
+  function star(at, col, w = 110) { add({ k: 'shinystar', x: at[0], y: at[1], w, life: 0.5, s: 0.3, s1: 1.2, vr: 2, color: col || null, fin: 0.05, fout: 0.6 }); }
   function sparks(at, color, n = 16, sp = 300) {
     for (let i = 0; i < n; i++) add({ k: 'glow', x: at[0], y: at[1], vx: R(-sp, sp), vy: R(-sp, sp), w: R(14, 30), life: R(0.3, 0.7), color });
   }
@@ -336,14 +356,14 @@ window.FX = (function () {
       await wait(1300); hit(B, c1, 2); shake(10, 0.5); flash(c1, 0.3, 0.4); await wait(350);
     },
     async aurora(A, B, d, c1, c2) {   // raio frio + anéis de aurora
-      aura(A, c1, 1.0); await wait(400);
+      aura(A, c1, 1.0); await wait(400); setTimeout(() => iceBurst(B, 10), 500);
       add({ k: 'lightsub', x: B[0], y: B[1] - 20, w: 520, life: 1.0, fps: 24, color: c1, loop: true });
       for (let i = 0; i < 3; i++) ring('circlelight', [B[0], B[1] + 160], 0.3, 1.6, 1.1, i ? c1 : c2, { vr: 1, h: 160, delay: i * 0.18 });
       for (let i = 0; i < 12; i++) streak([A[0] + d * 40, A[1] - 30], [B[0] + R(-60, 60), B[1] + R(-110, 60)], 0.4, c2, 14, i * 0.04);
       await wait(900); hit(B, c1, 2); ring('shock', B, 0.3, 2.4, 0.7, c2); shake(10, 0.5); flash(c1, 0.3, 0.5); await wait(350);
     },
     async phantom(A, B, d, c1, c2) {   // fantasma: fumaça roxa + fogo
-      aura(A, c1, 0.9); await wait(300);
+      aura(A, c1, 0.9); await wait(300); ghosts(A, B, 5, c2); setTimeout(() => fireRipple(B, 1.1), 300);
       for (let i = 0; i < 6; i++) add({ k: 'smoke', x: B[0] + R(-70, 70), y: B[1] + R(-70, 70), w: 420, life: 1.2, delay: i * 0.08, color: c2, a: 0.6, frame: i % 2 });
       add({ k: 'firehit', x: B[0], y: B[1] + 20, w: 460, life: 0.9, fps: 24, delay: 0.3 });
       ring('circle4', B, 0.3, 1.6, 1.2, c2, { vr: -2.5, delay: 0.1 });
@@ -356,6 +376,7 @@ window.FX = (function () {
       await wait(1300); ring('shock', B, 0.3, 3, 0.8, c1); hit(B, c2, 2); shake(12, 0.6); flash(c1, 0.4, 0.5); await wait(350);
     },
     async nova(A, B, d, c1, c2) {   // supernova
+      rays(A, c1, 1.3); setTimeout(() => fireRipple(B, 1.3), 700);
       aura(A, c1, 1.1); await wait(500);
       add({ k: 'core03', x: A[0] + d * 120, y: A[1], w: 360, life: 0.7, fps: 14, s: 0.3, s1: 1.2, color: c1 });
       proj('glow', [A[0] + d * 120, A[1]], B, 0.45, { w: 520, color: c1, s: 0.5, s1: 1.6 }); await wait(450);
@@ -370,7 +391,7 @@ window.FX = (function () {
       await wait(1300); hit(B, c1, 2.2); shake(14, 0.7); flash(c2, 0.4, 0.5); await wait(400);
     },
     async souls(A, B, d, c1, c2) {   // almas / fogo fátuo
-      aura(A, c1, 0.8); await wait(350);
+      aura(A, c1, 0.8); await wait(350); ghosts(A, B, 8, c2);
       for (let i = 0; i < 14; i++) setTimeout(() => { const s = [B[0] + R(-160, 160), B[1] + 200], e = [B[0] + R(-40, 40), B[1] - 60];
         proj('glow', s, e, 0.9, { w: R(60, 110), color: i % 2 ? c1 : c2, fin: 0.2 }); streak(s, e, 0.8, c1, 10); }, i * 70);
       for (let i = 0; i < 4; i++) add({ k: 'smoke', x: B[0] + R(-60, 60), y: B[1] + 40, w: 380, life: 1.3, delay: i * 0.12, color: c1, a: 0.5, frame: i % 2 });
@@ -400,7 +421,7 @@ window.FX = (function () {
       await wait(500); hit(B, c2, 2); ring('shock', B, 0.3, 2.2, 0.6, c1); shake(12, 0.5); flash(c2, 0.3, 0.55); await wait(350);
     },
     async ice(A, B, d, c1, c2) {   // caixão de gelo
-      aura(A, c1, 0.9); await wait(350);
+      aura(A, c1, 0.9); await wait(350); iceBurst(B, 14);
       add({ k: 'shieldbr', frame: 0, x: B[0], y: B[1], w: 520, life: 1.6, color: c1 });
       ring('barrier', B, 0.3, 1.4, 1.6, c1, { w: 520 }); for (let i = 0; i < 24; i++) setTimeout(() => sparks([B[0] + R(-90, 90), B[1] + R(-150, 120)], c2, 3, 160), i * 45);
       await wait(1300); hit(B, c2, 2); shake(9, 0.5); flash(c1, 0.4, 0.5); await wait(350);
@@ -412,6 +433,7 @@ window.FX = (function () {
       await wait(1700); hit(B, c1, 1.7); shake(8, 0.4); flash(c1, 0.3, 0.4); await wait(300);
     },
   };
+  function charge(A, col) { add({ k: 'wind05', x: A[0], y: A[1] + 30, w: 460, life: 0.9, color: col || null, fps: 22, a: 0.8 }); rays(A, col, 1.1); puff([A[0], A[1] + 320], 4); }
   async function sigFx(kind, A, B, d, c1, c2) { const f = SIGFX[kind] || SIGFX.comet; dim(true); try { await f(A, B, d, c1 || '#ffe08a', c2 || '#ffffff'); } catch (e) { console.error(e); } dim(false); }
   // ---------------- efeitos das cartas comuns
   const C_ATT = {
@@ -439,31 +461,30 @@ window.FX = (function () {
   async function card(sprite, A, B, d) {
     const att = C_ATT[sprite];
     if (att) {
-      const [t, col] = att, s = [A[0] + d * 70, A[1] - 20];
-      if (t === 'soco') { proj('soco', s, B, 0.28, { w: 130, sx: d, rot: 0, color: col }); streak(s, B, 0.35, col, 26); await wait(260); }
-      else if (t === 'streak') { streak(s, B, 0.35, col, 34); proj('glow', s, B, 0.22, { w: 70, color: col }); await wait(220); }
-      else if (t === 'orb') { proj('core01', s, B, 0.32, { w: 150, color: col, fps: 30, loop: true, rot: 0 }); streak(s, B, 0.4, col, 22); await wait(300); }
-      else if (t === 'multi') { for (let i = 0; i < 5; i++) { const e = [B[0] + R(-40, 40), B[1] + R(-70, 60)]; setTimeout(() => { streak(s, e, 0.25, col, 18); add({ k: 'star4', x: e[0], y: e[1], w: 50, life: 0.25, color: col }); }, i * 70); } await wait(380); }
-      else if (t === 'slash') { [[-0.6, 0], [0.5, 0.1], [-0.1, 0.2]].forEach(([r, del]) => add({ k: 'flareline', x: B[0], y: B[1] - 20, rot: r, w: 380, h: 70, life: 0.45, delay: del, color: col, whole: true })); await wait(250); }
-      else if (t === 'pierce') { proj('proj07', s, B, 0.18, { w: 220, color: col, loop: true }); streak(s, [B[0] + d * 150, B[1]], 0.4, col, 18); await wait(180); }
-      else if (t === 'zap') { add({ k: 'lightsub', x: B[0], y: B[1] - 20, w: 340, life: 0.6, fps: 26, color: col }); proj('glow', s, B, 0.25, { w: 60, color: col }); await wait(250); }
+      const [t, col] = att, s = [A[0] + d * 70, A[1] - 20], Z = 1.7;   // efeitos das cartas comuns maiores
+      if (t === 'soco') { proj('soco', s, B, 0.28, { w: 130 * Z, sx: d, rot: 0, color: col }); streak(s, B, 0.35, col, 26 * Z); await wait(260); }
+      else if (t === 'streak') { streak(s, B, 0.35, col, 34 * Z); proj('glow', s, B, 0.22, { w: 70 * Z, color: col }); await wait(220); }
+      else if (t === 'orb') { proj('core01', s, B, 0.32, { w: 150 * Z, color: col, fps: 30, loop: true, rot: 0 }); streak(s, B, 0.4, col, 22 * Z); await wait(300); }
+      else if (t === 'multi') { for (let i = 0; i < 5; i++) { const e = [B[0] + R(-70, 70), B[1] + R(-110, 90)]; setTimeout(() => { streak(s, e, 0.25, col, 18 * Z); add({ k: 'star4', x: e[0], y: e[1], w: 50 * Z, life: 0.25, color: col }); }, i * 70); } await wait(380); }
+      else if (t === 'slash') { [[-0.6, 0], [0.5, 0.1], [-0.1, 0.2]].forEach(([r, del]) => add({ k: 'flareline', x: B[0], y: B[1] - 20, rot: r, w: 380 * Z, h: 70 * Z, life: 0.5, delay: del, color: col, whole: true })); await wait(250); }
+      else if (t === 'pierce') { proj('proj07', s, B, 0.18, { w: 220 * Z, color: col, loop: true }); streak(s, [B[0] + d * 150, B[1]], 0.4, col, 18 * Z); await wait(180); }
+      else if (t === 'zap') { add({ k: 'lightsub', x: B[0], y: B[1] - 20, w: 340 * Z, life: 0.6, fps: 26, color: col }); proj('glow', s, B, 0.25, { w: 60 * Z, color: col }); await wait(250); }
       return;
     }
     const df = C_DEF[sprite]; if (!df) return;
     const [t, col] = df;
-    burst(A, col, d);
     if (t === 'aura') aura(A, col, 1.0);
-    else if (t === 'shield') { add({ k: 'shieldbr', frame: 0, x: A[0] + d * 120, y: A[1], w: 360, life: 0.9, color: col }); aura(A, col, 0.8); }
-    else if (t === 'barrier') { ring('barrier', A, 0.7, 1.15, 1.1, col, { w: 440 }); glow(A, col, 340, 0.8); }
-    else if (t === 'wind') { add({ k: 'wind05', x: A[0], y: A[1] + 40, w: 380, life: 0.8, color: col, fps: 22 }); for (let i = 0; i < 8; i++) streak([A[0] - 160, A[1] + R(-120, 140)], [A[0] + 160, A[1] + R(-120, 140)], 0.4, col, 10, i * 0.04); }
+    else if (t === 'shield') { bubble(A, col); add({ k: 'shieldbr', frame: 0, x: A[0] + d * 120, y: A[1], w: 360, life: 0.9, color: col }); aura(A, col, 0.8); }
+    else if (t === 'barrier') { bubble(A, col); ring('barrier', A, 0.7, 1.15, 1.1, col, { w: 440 }); glow(A, col, 340, 0.8); }
+    else if (t === 'wind') { speedLines(A, col); add({ k: 'wind05', x: A[0], y: A[1] + 40, w: 380, life: 0.8, color: col, fps: 22 }); for (let i = 0; i < 8; i++) streak([A[0] - 160, A[1] + R(-120, 140)], [A[0] + 160, A[1] + R(-120, 140)], 0.4, col, 10, i * 0.04); }
     else if (t === 'circle') { ring('circlelight', [A[0], A[1] + 180], 0.3, 1.3, 1.1, col, { vr: 2, h: 120 }); aura(A, col, 0.9); }
-    else if (t === 'fire') { add({ k: 'firehit', x: A[0], y: A[1] + 40, w: 360, life: 0.7, fps: 24 }); aura(A, col, 0.9); }
-    else if (t === 'heal') { aura(A, col, 1.0); sparks(A, col, 20, 160); }
-    else if (t === 'curse') ring('circle4', B, 0.3, 1.1, 1.0, col, { vr: -2 });
+    else if (t === 'fire') { fireRipple([A[0], A[1] + 40], 0.9); add({ k: 'firehit', x: A[0], y: A[1] + 40, w: 360, life: 0.7, fps: 24 }); aura(A, col, 0.9); }
+    else if (t === 'heal') { aura(A, col, 1.0); sparks(A, col, 20, 160); fairy(A, col); }
+    else if (t === 'curse') { ghosts(A, B, 3, col); } if (t === 'curse') ring('circle4', B, 0.3, 1.1, 1.0, col, { vr: -2 });
     else if (t === 'break') { add({ k: 'shieldbr', frame: 1, x: B[0], y: B[1], w: 380, life: 0.9, color: col }); sparks(B, col, 20, 260); }
-    else if (t === 'light') { for (let i = 0; i < 14; i++) streak([A[0] - 260, A[1] + R(-160, 160)], [A[0] + 260, A[1] + R(-160, 160)], 0.3, col, 14, i * 0.05); aura(A, col, 1.0); }
-    else if (t === 'seventh') { aura(A, col, 1.4); ring('circle1', A, 0.2, 1.4, 1.4, col, { vr: 1.5 }); flash(col, 0.4, 0.35); }
-    else if (t === 'dark') { for (let i = 0; i < 5; i++) add({ k: 'smoke', x: B[0] + R(-60, 60), y: B[1] + R(-60, 60), w: 380, life: 1.1, delay: i * 0.08, color: col, a: 0.55, frame: i % 2 }); }
+    else if (t === 'light') { speedLines(A, col); speedLines(B, col); for (let i = 0; i < 14; i++) streak([A[0] - 260, A[1] + R(-160, 160)], [A[0] + 260, A[1] + R(-160, 160)], 0.3, col, 14, i * 0.05); aura(A, col, 1.0); }
+    else if (t === 'seventh') { magicCircle(A, col); aura(A, col, 1.4); ring('circle1', A, 0.2, 1.4, 1.4, col, { vr: 1.5 }); flash(col, 0.4, 0.35); }
+    else if (t === 'dark') { ghosts(A, B, 4, col); for (let i = 0; i < 5; i++) add({ k: 'smoke', x: B[0] + R(-60, 60), y: B[1] + R(-60, 60), w: 380, life: 1.1, delay: i * 0.08, color: col, a: 0.55, frame: i % 2 }); }
     else if (t === 'zapT') add({ k: 'lightsub', x: B[0], y: B[1] - 20, w: 380, life: 0.8, fps: 22, color: col, loop: true });
     await wait(150);
   }
@@ -495,5 +516,5 @@ window.FX = (function () {
   function dim(on, a = 0.55) { if (dimEl) { dimEl.style.opacity = on ? a : 0; } }
   async function special(key, A, B, d) { const f = SPECIALS[key === 'mestre' ? 'saga' : key]; if (!f) return; dim(true); try { await f(A, B, d); } catch (e) { console.error(e); } dim(false); }
   async function cardFx(sprite, A, B, d) { dim(true, 0.3); try { await card(sprite, A, B, d); } finally { setTimeout(() => dim(false), 350); } }
-  return { init, resize, reveal, special, sig: sigFx, card: cardFx, hit, horn: async (A, B, d) => { dim(true); await SPECIALS.horn(A, B, d); dim(false); }, add, shake, flash };
+  return { init, resize, reveal, special, sig: sigFx, card: cardFx, hit, puff, lens, star, rays, magicCircle, fairy, speedLines, charge, bubble, horn: async (A, B, d) => { dim(true); await SPECIALS.horn(A, B, d); dim(false); }, add, shake, flash };
 })();

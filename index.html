@@ -130,6 +130,7 @@
           <label>Clima<select id="rWx"></select></label>
           <label>Vida (HP)<select id="rHp"></select></label>
           <label>Vida e cosmo<select id="rEpic"><option value="0">Normal</option><option value="1">Batalha Épica (+100 vida, +30 cosmo)</option></select></label>
+          <label>Tempo de turno<select id="rTimer"><option value="30">30 segundos (como no original)</option><option value="45">45 segundos</option><option value="60">60 segundos</option><option value="0">Sem limite</option></select></label>
           <label>Reações por toque<select id="rReact"><option value="1">Ligadas</option><option value="0">Desligadas (para os dois)</option></select></label>
           <label>Fúria<select id="rRage"><option value="1">Ligada</option><option value="0">Desligada (sem Cosmo Final)</option></select></label>
           <label>Equipe<select id="rTeam"><option value="1">Solo (1 cavaleiro)</option><option value="2">Dupla</option><option value="3">Trio</option></select></label>
@@ -151,6 +152,7 @@
   <!-- BATALHA -->
   <section id="battle" class="screen">
     <div class="bg" data-bg="bg_battle"></div>
+    <div class="amb"><i class="beam b1"></i><i class="beam b2"></i><i class="pil p1"></i><i class="pil p2"></i><i class="pil p3"></i><i class="sunr"></i><b class="emb" style="--x:8;--d:0.0s;--t:9.0s;--s:1.00"></b><b class="emb" style="--x:17;--d:3.1s;--t:11.0s;--s:0.70"></b><b class="emb" style="--x:26;--d:6.2s;--t:8.5s;--s:1.10"></b><b class="emb" style="--x:34;--d:1.4s;--t:12.0s;--s:0.80"></b><b class="emb" style="--x:43;--d:4.8s;--t:10.0s;--s:1.00"></b><b class="emb" style="--x:52;--d:7.5s;--t:9.5s;--s:0.60"></b><b class="emb" style="--x:61;--d:2.2s;--t:11.5s;--s:0.90"></b><b class="emb" style="--x:70;--d:5.6s;--t:8.0s;--s:1.20"></b><b class="emb" style="--x:79;--d:0.8s;--t:10.5s;--s:0.70"></b><b class="emb" style="--x:88;--d:3.9s;--t:9.0s;--s:1.00"></b><b class="emb" style="--x:13;--d:8.4s;--t:12.5s;--s:0.60"></b><b class="emb" style="--x:48;--d:9.6s;--t:10.0s;--s:0.80"></b><b class="emb" style="--x:66;--d:10.7s;--t:9.2s;--s:1.00"></b><b class="emb" style="--x:92;--d:6.9s;--t:11.0s;--s:0.75"></b></div>
     <div class="fighter me"><div class="shadow"></div><div class="faura"><i class="c1"></i><canvas width="520" height="700"></canvas></div><img alt=""></div>
     <div class="fighter op"><div class="shadow"></div><div class="faura"><i class="c1"></i><canvas width="520" height="700"></canvas></div><img alt=""></div>
     <div id="wx"></div><div id="fxdim"></div><canvas id="fxc"></canvas>
@@ -164,7 +166,7 @@
     <div class="pd me" data-side="me"><img data-src="powdef" alt=""><span class="def"></span><span class="att"></span><button class="star" data-img="b_passiva" aria-label="Passiva"></button></div>
     <div class="pd op" data-side="op"><img data-src="powdef" alt=""><span class="def"></span><span class="att"></span><button class="star" data-img="b_passiva" aria-label="Passiva"></button></div>
     <div class="topmid"><button class="imgbtn" data-img="b_menu" data-act="quit" aria-label="Menu" style="width:150px;height:54px"></button>
-      <button class="endturn" data-act="end" aria-label="Finalizar turno"></button><div class="turninfo"></div><button class="modtag" data-act="modinfo"></button><button class="modtag wxt" data-act="wxinfo"></button><div class="trapi me" id="trapMe"></div><div class="trapi op" id="trapOp"></div></div>
+      <button class="endturn" data-act="end" aria-label="Finalizar turno"></button><div class="turninfo"></div><div id="tclock"><i class="ring"></i><b></b></div><button class="modtag" data-act="modinfo"></button><button class="modtag wxt" data-act="wxinfo"></button><div class="trapi me" id="trapMe"></div><div class="trapi op" id="trapOp"></div></div>
     <div class="ophand"></div>
     <img class="rail" data-src="rail" alt=""><img class="railtop" data-src="rail_top" alt="">
     <div class="logline"></div>
@@ -213,12 +215,12 @@
   <div class="modal" id="mMis"><div class="card-panel mis"><h3 style="margin:0;color:var(--gold);font-size:26px">Missões e Conquistas</h3>
     <div class="misrank"></div><div class="mislist"></div><h4 class="mish">Conquistas</h4><div class="achlist"></div>
     <button class="btn small ghost" data-act="close">Fechar</button></div></div>
-  <div class="modal" id="mSig"><div class="card-panel" style="max-width:560px"><h3 class="sgt" style="margin:0;color:var(--gold);font-size:26px"></h3><div class="twbody"><div class="sgd"></div><div style="color:#aaa;font-size:14px">Golpe Assinatura: carrega durante a luta e pode ser usado até 2 vezes.</div></div><div class="row"><button class="btn small" data-act="siggo">Usar</button><button class="btn small ghost" data-act="close">Cancelar</button></div></div></div>
+  <div class="modal" id="mSig"><div class="card-panel" style="max-width:560px"><h3 class="sgt" style="margin:0;color:var(--gold);font-size:26px"></h3><div class="twbody"><div class="sgd"></div><div class="sgs" style="color:#ffe08a;font-size:16px"></div><div style="color:#aaa;font-size:14px">Golpe Assinatura: carrega durante a luta e pode ser usado até 2 vezes.</div></div><div class="row"><button class="btn small" data-act="siggo">Usar</button><button class="btn small ghost" data-act="close">Fechar</button></div></div></div>
   <div class="modal" id="mUlt"><div class="card-panel" style="max-width:680px"><h3 style="margin:0;color:var(--gold);font-size:26px">Fúria cheia! Escolha o poder</h3>
     <div class="twbody"><div><b style="color:#ffcf40">Cosmo Final</b> — golpe único: 40 de dano + sua Força, drena 25 de cosmo do oponente, cura 15 de vida e dá +5 de Força permanente.</div>
     <div><b style="color:#9fe8ff">8º Sentido (Arayashiki)</b> — o sentido que permite manter a consciência, a individualidade e o controle do Cosmo ao cruzar a fronteira da morte e entrar no Inferno (Mundo dos Mortos) sem se submeter às leis de Hades. Por 3 turnos: remove seus efeitos negativos, fica imune a novos, ganha +8 de Força e Defesa, e sobrevive ao primeiro golpe fatal com 1 de vida (+25 de cosmo).</div>
-    <div style="color:#aaa;font-size:14px">Cada poder pode ser usado uma vez por luta.</div></div>
-    <div class="row"><button class="btn small" data-act="ultgo">Cosmo Final</button><button class="btn small" data-act="sensego">8º Sentido</button><button class="btn small ghost" data-act="close">Cancelar</button></div></div></div>
+    <div class="ust" style="color:#ffe08a;font-size:16px"></div><div style="color:#aaa;font-size:14px">Cada poder pode ser usado uma vez por luta.</div></div>
+    <div class="row"><button class="btn small" data-act="ultgo">Cosmo Final</button><button class="btn small" data-act="sensego">8º Sentido</button><button class="btn small ghost" data-act="close">Fechar</button></div></div></div>
   <div class="modal" id="mTeam"><div class="card-panel rgrid" style="min-width:560px;display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;color:var(--gold);font-size:26px">Opções da luta</h3>
     <label>Vida (HP) dos dois<select id="tHp"></select></label>
     <label>Reações por toque<select id="tReact"><option value="1">Ligadas</option><option value="0">Desligadas</option></select></label>

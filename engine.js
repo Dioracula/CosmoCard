@@ -398,7 +398,7 @@
     if (G.wx === 'vento' && d > 0) d += 4;
     if (target.charId === ID.SHIRYU && d <= 10) { if (d > 0) emit(G, { t: 'text', p: target.idx, txt: 'ESCUDO DO DRAGÃO', kind: 'block' }); d = 0; }
     if (target.charId === ID.MESTRE && d > 0) { d = Math.max(0, d - 8); emit(G, { t: 'passive', p: target.idx }); }
-    if (attacker.charId === ID.MIRO && attacker !== target && d > 0 && target.stats.life < target.stats.maxLife * 0.3) { d += 12; emit(G, { t: 'text', p: attacker.idx, txt: 'HONRA ESCARLATE', kind: 'good' }); }
+    if (attacker.charId === ID.MIRO && attacker !== target && d > 0 && target.stats.life < target.stats.maxLife * 0.3) { d += 12; emit(G, { t: 'text', p: attacker.idx, uq: 1, txt: 'HONRA ESCARLATE', kind: 'good' }); }
     if (d > 0) {
       const cc = (G.mod === 'critico' ? 0.2 : 0) + (attacker.crit || 0) + (attacker.charId === ID.SHURA && attacker !== target ? 0.15 : 0);
       if (cc > 0 && Math.random() < cc) { d = Math.round(d * 1.5); emit(G, { t: 'text', p: target.idx, txt: 'CRÍTICO!', kind: 'good', crit: true }); }
@@ -413,7 +413,7 @@
         if (gq >= 2 && !G.norage) target.rage = Math.min(100, (target.rage || 0) + 6); }
     }
     if (d > 0 && hasRelic(target, 'ferro')) d = Math.max(0, d - 3);
-    if (d > 0 && target.charId === ID.ALDEBARAN && attacker !== target) { const cap = Math.round(target.stats.maxLife * 0.25); if (d > cap) { d = cap; emit(G, { t: 'text', p: target.idx, txt: 'MURALHA TAURINA', kind: 'block' }); } }
+    if (d > 0 && target.charId === ID.ALDEBARAN && attacker !== target) { const cap = Math.round(target.stats.maxLife * 0.25); if (d > cap) { d = cap; emit(G, { t: 'text', p: target.idx, uq: 1, txt: 'MURALHA TAURINA', kind: 'block' }); } }
     let rebirth = false;
     if (d > 0 && target.charId === ID.IKKI && !target.uq.reborn && target.stats.life - d <= 0) { d = Math.max(0, target.stats.life - 1); target.uq.reborn = true; rebirth = true; }
     if (d > 0 && hasRelic(target, 'ultima') && !target.ultimaUsed && target.stats.life - d <= 0) { d = Math.max(0, target.stats.life - 1); target.ultimaUsed = true; emit(G, { t: 'text', p: target.idx, txt: 'ÚLTIMA CHANCE!', kind: 'good' }); }
@@ -424,7 +424,7 @@
       for (const db of target.debuffs) if (db.isDamageConversion) db.conversionDamageTotal = (db.conversionDamageTotal || 0) + d;
       target.stats.life = clamp(target.stats.life - d, 0, target.stats.maxLife);
       emit(G, { t: 'dmg', p: target.idx, v: d });
-      if (rebirth) { emit(G, { t: 'text', p: target.idx, txt: 'A FÊNIX RENASCE!', kind: 'good' }); updateStats(G, target, { life: Math.round(target.stats.maxLife * 0.25) }, true); }
+      if (rebirth) { emit(G, { t: 'text', p: target.idx, uq: 1, txt: 'A FÊNIX RENASCE!', kind: 'good' }); updateStats(G, target, { life: Math.round(target.stats.maxLife * 0.25) }, true); }
     } else {
       emit(G, { t: 'dmg', p: target.idx, v: 0 });
     }
@@ -468,18 +468,18 @@
   function uniqTook(G, p, attacker) {
     if (attacker === p || G.over || p.stats.life <= 0) return;
     const r = p.stats.life / p.stats.maxLife, u = p.uq;
-    if (p.charId === ID.SEIYA && !u.miracle && r <= 0.3) { u.miracle = 1; emit(G, { t: 'text', p: p.idx, txt: 'MILAGRE DE PÉGASO!', kind: 'good' }); updateStats(G, p, { life: 50, cosmo: 30 }, true); }
-    if (p.charId === ID.SHIRYU && !u.dragon && r <= 0.5) { u.dragon = 1; emit(G, { t: 'text', p: p.idx, txt: 'DRAGÃO ASCENDENTE!', kind: 'good' }); updateStats(G, p, { attPower: 10 }, true); }
-    if (p.charId === ID.AIOROS && !u.guard && r <= 0.4) { u.guard = 1; emit(G, { t: 'text', p: p.idx, txt: 'GUARDIÃO DE ATENA!', kind: 'good' }); updateStats(G, p, { defPower: 15 }, true); }
+    if (p.charId === ID.SEIYA && !u.miracle && r <= 0.3) { u.miracle = 1; emit(G, { t: 'text', p: p.idx, uq: 1, txt: 'MILAGRE DE PÉGASO!', kind: 'good' }); updateStats(G, p, { life: 50, cosmo: 30 }, true); }
+    if (p.charId === ID.SHIRYU && !u.dragon && r <= 0.5) { u.dragon = 1; emit(G, { t: 'text', p: p.idx, uq: 1, txt: 'DRAGÃO ASCENDENTE!', kind: 'good' }); updateStats(G, p, { attPower: 10 }, true); }
+    if (p.charId === ID.AIOROS && !u.guard && r <= 0.4) { u.guard = 1; emit(G, { t: 'text', p: p.idx, uq: 1, txt: 'GUARDIÃO DE ATENA!', kind: 'good' }); updateStats(G, p, { defPower: 15 }, true); }
   }
   function uniqDone(G, p, target, d) {
     if (p === target || G.over || !(d > 0)) return;
     const u = p.uq;
-    if (p.charId === ID.SEIYACAP) { u.hits = (u.hits || 0) + 1; if (u.hits % 3 === 0 && target.stats.life > 0) { emit(G, { t: 'text', p: p.idx, txt: 'COMETA ASCENDENTE!', kind: 'good', combo: true }); updateStats(G, target, { life: -12 }, true); checkOver(G); } }
-    if (p.charId === ID.HYOGA && target.stats.cosmo > 0) { emit(G, { t: 'text', p: p.idx, txt: 'PÓ DE DIAMANTE', kind: 'good' }); updateStats(G, target, { cosmo: -8 }, true); }
+    if (p.charId === ID.SEIYACAP) { u.hits = (u.hits || 0) + 1; if (u.hits % 3 === 0 && target.stats.life > 0) { emit(G, { t: 'text', p: p.idx, uq: 1, txt: 'COMETA ASCENDENTE!', kind: 'good', combo: true }); updateStats(G, target, { life: -12 }, true); checkOver(G); } }
+    if (p.charId === ID.HYOGA && target.stats.cosmo > 0) { emit(G, { t: 'text', p: p.idx, uq: 1, txt: 'PÓ DE DIAMANTE', kind: 'good' }); updateStats(G, target, { cosmo: -8 }, true); }
     if (p.charId === ID.DEATHMASK) updateStats(G, p, { life: Math.max(1, Math.round(d * 0.15)) }, true);
     if (p.charId === ID.CAMUS && (u.drain || 0) < 15 && !target.senseOn) { u.drain = (u.drain || 0) + 3; updateStats(G, target, { attPower: -3 }, true); }
-    if (p.charId === ID.AFRODITE && !target.senseOn) { target.poison = { t: 2, v: 4 }; emit(G, { t: 'text', p: target.idx, txt: 'ROSA SANGRENTA: envenenado', kind: 'fail' }); }
+    if (p.charId === ID.AFRODITE && !target.senseOn) { target.poison = { t: 2, v: 4 }; emit(G, { t: 'text', p: target.idx, uqOf: p.idx, txt: 'ROSA SANGRENTA: envenenado', kind: 'fail' }); }
   }
 
   function mkDebuff(o) {
@@ -831,7 +831,7 @@
     p.defPrev = !!p.defNow; p.defNow = false;
     turnDebuffs(G, p, false); if (G.over) return true;
     if (p.senseOn && p.sense <= 0) { p.senseOn = false; updateStats(G, p, { attPower: -SENSE_BONUS, defPower: -SENSE_BONUS }, false); emit(G, { t: 'text', p: p.idx, txt: '8º Sentido acabou', kind: 'fail' }); }
-    if (p.charId === ID.SHAKA) { if (removeOneNegative(G, p)) emit(G, { t: 'passive', p: p.idx }); if (!p.atkCount) { emit(G, { t: 'text', p: p.idx, txt: 'MEDITAÇÃO (OM)', kind: 'good' }); updateStats(G, p, { cosmo: 20 }, true); } }
+    if (p.charId === ID.SHAKA) { if (removeOneNegative(G, p)) emit(G, { t: 'passive', p: p.idx }); if (!p.atkCount) { emit(G, { t: 'text', p: p.idx, uq: 1, txt: 'MEDITAÇÃO (OM)', kind: 'good' }); updateStats(G, p, { cosmo: 20 }, true); } }
     const extra = p.debuffs.some(d => d.isGetExtraTurn);
     if (!extra) G.turn = 1 - G.turn; else emit(G, { t: 'text', p: p.idx, txt: 'TURNO EXTRA!', kind: 'good', sfx: 'sfx_velocidade_da_luz2' });
     const n = G.p[G.turn];
@@ -856,13 +856,13 @@
       const m = n.uq.mode || 0;
       if (m === 1) updateStats(G, n, { attPower: -6 }, false); if (m === 2) updateStats(G, n, { defPower: -6 }, false);
       n.uq.mode = m === 1 ? 2 : 1;
-      emit(G, { t: 'text', p: n.idx, txt: n.uq.mode === 1 ? 'LADO SOMBRIO: +6 Força' : 'LADO DA LUZ: +6 Defesa', kind: n.uq.mode === 1 ? 'fail' : 'good' });
+      emit(G, { t: 'text', p: n.idx, uq: 1, txt: n.uq.mode === 1 ? 'LADO SOMBRIO: +6 Força' : 'LADO DA LUZ: +6 Defesa', kind: n.uq.mode === 1 ? 'fail' : 'good' });
       updateStats(G, n, n.uq.mode === 1 ? { attPower: 6 } : { defPower: 6 }, false);
     }
     if (n.charId === ID.MESTRE && Math.random() < 0.3) {   // Genrō Maō Ken
       const o = G.p[1 - n.idx];
       if (!o.senseOn && o.stats.life > 0) {
-        emit(G, { t: 'text', p: n.idx, txt: 'GENRŌ MAŌ KEN!', kind: 'counter' });
+        emit(G, { t: 'text', p: n.idx, uq: 1, txt: 'GENRŌ MAŌ KEN!', kind: 'counter' });
         updateStats(G, o, { cosmo: -15 }, true);
         o.debuffs.push(mkDebuff({ debuffName: 'Mente Dominada', negativeDebuff: 1, isPassivePersistentDebuff: 1, turnDuration: 2, drawCardBuff: -1, debuffDescription: 'Saca uma carta a menos no próximo turno.' }));
         emit(G, { t: 'debuff', p: o.idx, name: 'Mente Dominada', good: false });
